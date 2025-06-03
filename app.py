@@ -1,59 +1,49 @@
-import openai
 import streamlit as st
+import math
 
-openai.api_key = st.secrets["openai"]["api_key"]
+st.set_page_config(page_title="Cone Material & Layout Estimator", layout="centered")
 
-
-st.set_page_config(page_title="Cone Material Calculator", layout="centered")
 st.title("📐 Cone Material & Layout Estimator")
-
 st.markdown("Enter the specs for the eccentric cone, and get an estimate of the optimal plate layout.")
 
-# --- Inputs ---
-tank_diameter = st.number_input("Tank Diameter (in inches)", min_value=1)
-angle_of_repose = st.number_input("Angle of Repose (in degrees)", min_value=1, max_value=89)
+# Inputs
+diameter = st.number_input("Tank Diameter (in inches)", min_value=1)
+angle = st.number_input("Angle of Repose (in degrees)", min_value=1)
 moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon Steel"])
 
-# --- Button ---
-if st.button("🔘 Calculate Cone Layout"):
-    st.markdown("---")
-    st.subheader("🧾 Recommended Layout")
-
-def calculate_cone_layout(diameter, angle, moc):
-    import math
-
+def calculate_cone_area(diameter, angle_deg):
     radius = diameter / 2
-    height = radius / math.tan(math.radians(angle))
+    angle_rad = math.radians(angle_deg)
+    height = radius * math.tan(angle_rad)
     slant_height = math.sqrt(radius**2 + height**2)
-    surface_area = math.pi * radius * slant_height
+    return math.pi * radius * slant_height
 
+def get_plate_options(moc):
     if moc == "Stainless Steel":
-        plate_options = [(48, l) for l in [96, 120, 144, 180, 240, 360, 480]]
+        return [(w, l) for w in [48, 60] for l in [96, 120, 144] + list(range(180, 481))]
     else:  # Carbon Steel
-        plate_options = [(96, l) for l in [240, 360, 480]]
+        return [(w, l) for w in [48, 60] for l in [96, 120, 144, 240, 360, 480]]
 
-    best_fit = None
-    fewest_plates = float('inf')
+def optimize_plate_usage(area_needed, plate_options):
+    options = []
+    for w, l in plate_options:
+        plate_area = w * l
+        plates_needed = math.ceil(area_needed / plate_area)
+        total_waste = (plates_needed * plate_area) - area_needed
+        options.append((plates_needed, (w, l), total_waste))
+    options.sort(key=lambda x: (x[0], x[2]))  # Prioritize fewer plates and minimal waste
+    return options[0] if options else None
 
-    for width, length in plate_options:
-        area = (width * length) / 144  # in² → ft²
-        num_plates = surface_area / area
-        if num_plates < fewest_plates:
-            fewest_plates = num_plates
-            best_fit = (width, length)
+if st.button("Calculate Cone Layout"):
+    cone_area = calculate_cone_area(diameter, angle)
+    plate_options = get_plate_options(moc)
+    best = optimize_plate_usage(cone_area, plate_options)
 
-    return {
-        "Tank Diameter (in)": diameter,
-        "Angle of Repose (deg)": angle,
-        "Material": moc,
-        "Estimated Slant Height (in)": round(slant_height, 2),
-        "Cone Surface Area (ft²)": round(surface_area, 2),
-        "Recommended Plate Size (in)": f"{best_fit[0]} x {best_fit[1]}",
-        "Estimated # of Plates Needed": math.ceil(fewest_plates)
-   
-  if st.button("Calculate Cone Layout"):
-    result = calculate_cone_layout(diameter, angle, moc)
-    st.subheader("📐 Recommended Layout")
-    for key, val in result.items():
-        st.write(f"**{key}:** {val}")
-        
+    if best:
+        plates_needed, (width, length), waste = best
+        st.subheader("📊 Optimal Layout Recommendation")
+        st.write(f"**Plates Required**: {plates_needed}")
+        st.write(f"**Plate Size**: {width}\" x {length}\"")
+        st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
+    else:
+        st.error("No viable plate layout found.")
