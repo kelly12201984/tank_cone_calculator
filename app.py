@@ -19,16 +19,41 @@ if st.button("🔘 Calculate Cone Layout"):
     st.markdown("---")
     st.subheader("🧾 Recommended Layout")
 
-    # Placeholder logic for now
+def calculate_cone_layout(diameter, angle, moc):
+    import math
+
+    radius = diameter / 2
+    height = radius / math.tan(math.radians(angle))
+    slant_height = math.sqrt(radius**2 + height**2)
+    surface_area = math.pi * radius * slant_height
+
     if moc == "Stainless Steel":
-        plate_options = ["48/60 x 96", "48/60 x 120", "48/60 x 144", "48/60 x 180-480"]
-    else:
-        plate_options = ["96/120 x 240", "96/120 x 360", "96/120 x 480"]
+        plate_options = [(48, l) for l in [96, 120, 144, 180, 240, 360, 480]]
+    else:  # Carbon Steel
+        plate_options = [(96, l) for l in [240, 360, 480]]
 
-    # Just return something rough and static for now
-    st.write("✅ Suggested Plate Size:", plate_options[1])
-    st.write("📏 Estimated Number of Courses:", 2)
-    st.write("🧩 Pieces per Course:", "4 / 2")
-    st.write("🔄 Break Diameter:", f"{tank_diameter / 2:.1f}\" (placeholder)")
+    best_fit = None
+    fewest_plates = float('inf')
 
-    st.info("These results are just placeholders. Calculation logic is coming soon!")
+    for width, length in plate_options:
+        area = (width * length) / 144  # in² → ft²
+        num_plates = surface_area / area
+        if num_plates < fewest_plates:
+            fewest_plates = num_plates
+            best_fit = (width, length)
+
+    return {
+        "Tank Diameter (in)": diameter,
+        "Angle of Repose (deg)": angle,
+        "Material": moc,
+        "Estimated Slant Height (in)": round(slant_height, 2),
+        "Cone Surface Area (ft²)": round(surface_area, 2),
+        "Recommended Plate Size (in)": f"{best_fit[0]} x {best_fit[1]}",
+        "Estimated # of Plates Needed": math.ceil(fewest_plates)
+   
+  if st.button("Calculate Cone Layout"):
+    result = calculate_cone_layout(diameter, angle, moc)
+    st.subheader("📐 Recommended Layout")
+    for key, val in result.items():
+        st.write(f"**{key}:** {val}")
+        
