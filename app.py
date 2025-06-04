@@ -160,8 +160,9 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
         course_info = calculate_courses_and_breaks(diameter, angle, moc)
         cone_area = calculate_cone_area(diameter, angle)
         plate_options = get_plate_options(moc)
-    # 2. Optimize plate usage
-best = optimize_plate_usage(cone_area, plate_options, course_info)
+        
+        # 2. Optimize plate usage
+            best = optimize_plate_usage(cone_area, plate_options, course_info)
 
 if best:
     plates_needed, (plate_width, plate_length), waste = best
@@ -181,7 +182,7 @@ if best:
         else:
             st.write(
                 f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
-                f"**{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
+                f"{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
             )
 
     # 6. Display course-level geometry
