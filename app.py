@@ -24,23 +24,38 @@ def get_plate_options(moc):
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 def calculate_courses_and_breaks(diameter, angle_deg, moc):
-    plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
-    max_course_slant = max(plate_widths)
+
     total_slant = calculate_slant_height(diameter, angle_deg)
-    num_courses = math.ceil(total_slant / max_course_slant)
-    course_slant = total_slant / num_courses
     angle_rad = math.radians(angle_deg)
-    break_diameters = []
-    for i in range(num_courses + 1):
-        rem_slant = total_slant - (i * course_slant)
-        break_radius = rem_slant * math.sin(angle_rad)
-        break_diameters.append(round(break_radius * 2, 2))
-    return {
-        "Total Slant Height": round(total_slant, 2),
-        "Number of Courses": num_courses,
-        "Course Slant Height": round(course_slant, 2),
-        "Break Diameters (Top → Bottom)": break_diameters
-    }
+
+    # Get valid plate widths based on material
+    plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
+    best_config = None
+
+    for plate_w in plate_widths:
+        num_courses = math.ceil(total_slant / plate_w)
+        course_slant = total_slant / num_courses
+
+        break_diameters = []
+        for i in range(num_courses + 1):
+            rem_slant = total_slant - (i * course_slant)
+            break_radius = rem_slant * math.sin(angle_rad)
+            break_diameters.append(round(break_radius * 2, 2))
+
+        config = {
+            "Total Slant Height": round(total_slant, 2),
+            "Number of Courses": num_courses,
+            "Course Slant Height": round(course_slant, 2),
+            "Break Diameters (Top → Bottom)": break_diameters,
+            "Used Plate Width": plate_w
+        }
+
+        # Choose the config with fewer courses (shorter vertical breaks = better)
+        if best_config is None or config["Number of Courses"] < best_config["Number of Courses"]:
+            best_config = config
+
+    return best_config
+
 
 def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
     break_diameters = course_info["Break Diameters (Top → Bottom)"]
