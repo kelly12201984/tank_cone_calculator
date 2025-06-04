@@ -134,49 +134,50 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
 
 # 🧠 Main button logic
 if st.button("Calculate Cone Layout"):
+    # 1. Inputs and geometry
     slant_height = calculate_slant_height(diameter, angle)
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
     cone_area = calculate_cone_area(diameter, angle)
     plate_options = get_plate_options(moc)
-    best = optimize_plate_usage(cone_area, plate_options, course_info)
+
+    # 2. Optimize plate usage using real segment geometry
+    best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
+
     if best:
         plates_needed, (plate_width, plate_length), waste = best
-        course_layout = estimate_plate_usage_per_course(course_info, w, l)
 
-    st.subheader("📊 Optimal Layout Recommendation")
-    st.write(f"**Plates Required**: {plates_needed}")
-    st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
-    st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
+        # 3. Estimate actual usage per course using modeled segments
+        course_layout = estimate_plate_usage_per_course(
+            course_info, plate_width, plate_length, segments_per_course
+        )
 
-    st.subheader("📐 Estimated Plate Usage Per Course")
-    for result in course_layout:
-        if isinstance(result["plates"], str):
-            st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
-        else:
-            st.write(
-                f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
-                f"**{result['plates']} plate(s)**"
-            )
-    # Summary line for Chris (number of plates per course, plate size)
-    total_plates = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
-    st.markdown(f"**Summary → Total Plates Needed: {total_plates} using {plate_width}\" x {plate_length}\" plates**")
-
-
-    # Display Course Info
-    st.subheader("🧱 Cone Course Layout")
-    st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
-    st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
-    st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
-    st.write("**Break Diameters (top → bottom)**:")
-    st.write(course_info["Break Diameters (Top → Bottom)"])
-
-    # Display Optimal Plate Layout
-    if best:
-        plates_needed, (width, length), waste = best
+        # 4. Output summary
         st.subheader("📊 Optimal Layout Recommendation")
         st.write(f"**Plates Required**: {plates_needed}")
-        st.write(f"**Plate Size**: {width}\" x {length}\"")
+        st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
         st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
+
+        st.subheader("📐 Estimated Plate Usage Per Course")
+        for result in course_layout:
+            if isinstance(result["plates"], str):
+                st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
+            else:
+                st.write(
+                    f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
+                    f"**{result['plates']} plate(s)**"
+                )
+
+        # 5. Summary line for Chris
+        total_plates = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
+        st.markdown(f"**Summary → Total Plates Needed: {total_plates} using {plate_width}\" x {plate_length}\" plates**")
+
+        # 6. Display course-level geometry
+        st.subheader("🧱 Cone Course Layout")
+        st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
+        st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
+        st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
+        st.write("**Break Diameters (top → bottom)**:")
+        st.write(course_info["Break Diameters (Top → Bottom)"])
     else:
-        st.error("No viable plate layout found.")
-    
+        st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
+
