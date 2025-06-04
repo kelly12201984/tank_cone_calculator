@@ -141,7 +141,7 @@ if st.button("Calculate Cone Layout"):
     best = optimize_plate_usage(cone_area, plate_options, course_info)
     if best:
         plates_needed, (plate_width, plate_length), waste = best
-        course_layout = estimate_plate_usage_per_course(course_info, w, l, segments_per_course)
+        course_layout = estimate_plate_usage_per_course(course_info, w, l)
 
     st.subheader("📊 Optimal Layout Recommendation")
     st.write(f"**Plates Required**: {plates_needed}")
