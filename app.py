@@ -179,12 +179,12 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
         st.subheader("📐 Estimated Plate Usage Per Course")
         for result in course_layout:
             if isinstance(result["plates"], str):
-            st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
+                st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
             else:
                 st.write(
                     f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
                     f"**{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
-        )
+                )
 
        
 
