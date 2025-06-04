@@ -152,7 +152,7 @@ if st.button("Calculate Cone Layout"):
 
         st.subheader("📊 Optimal Layout Recommendation")
         st.write(f"**Plates Required**: {plates_needed}")
-        st.write(f"**Plate Size**: {plate_width}" x {plate_length}"")
+        st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
         st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
 
         st.subheader("📐 Estimated Plate Usage Per Course")
