@@ -9,6 +9,11 @@ st.markdown("Enter the specs for the concentric cone, and get an estimate of the
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1, value=168)
 angle = st.number_input("Angle of Repose (in degrees)", min_value=1, value=60)
 moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon Steel"])
+# Optional: Override number of segments (gores) per course
+segments_per_course = st.number_input(
+    "Segments Per Course (Gores)", min_value=2, max_value=12, value=4, step=1,
+    help="How many segments to divide each course into (4 is standard)"
+)
 
 # --- Slant height
 def calculate_slant_height(diameter, angle_deg):
@@ -149,10 +154,10 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
     return results
 
 # --- Optimizer
-def optimize_plate_usage(area_needed, plate_options, course_info):
+def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_course):
     options = []
     for w, l in plate_options:
-        course_layout = estimate_plate_usage_per_course(course_info, w, l)
+        course_layout = estimate_plate_usage_per_course(course_info, w, l, segments_per_course)
         if any(isinstance(result["plates"], str) for result in course_layout):
             continue
         plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
@@ -170,7 +175,7 @@ if st.button("Calculate Cone Layout"):
     cone_area = math.pi * (diameter / 2) * slant_height
     plate_options = get_plate_options(moc)
 
-    best = optimize_plate_usage(cone_area, plate_options, course_info)
+    best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
 
     if best:
         plates_needed, (plate_w, plate_l), waste, layout = best
