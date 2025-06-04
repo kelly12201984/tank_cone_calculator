@@ -14,7 +14,7 @@ moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon
 def calculate_slant_height(diameter, angle_deg):
     radius = diameter / 2
     angle_rad = math.radians(angle_deg)
-    slant = radius / math.tan(angle_rad)
+    slant = radius / math.sin(angle_rad)
     return round(slant, 2)
 
 def calculate_cone_area(diameter, angle_deg):
