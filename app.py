@@ -44,7 +44,7 @@ def get_plate_options(moc):
     else:  # Carbon Steel
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
-def optimize_plate_usage(area_needed, plate_options, course_info):
+def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_course):
     options = []
     for w, l in plate_options:
         plate_area = w * l
