@@ -3,8 +3,8 @@ import math
 
 st.set_page_config(page_title="Cone Material & Layout Estimator", layout="centered")
 
-st.title("📐 Cone Material & Layout Estimator")
-st.markdown("Enter the specs for the eccentric cone, and get an estimate of the optimal plate layout.")
+st.title("📐 Concentric Cone Material & Layout Estimator")
+st.markdown("Enter the specs for the concentric cone, and get an estimate of the optimal plate layout.")
 
 # Inputs
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1)
@@ -65,24 +65,69 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         "Break Diameters (Top → Bottom)": break_diameters
     }
 # 🔧 Arc Nesting Function
-def estimate_plate_count_per_course(d_top, d_bottom, slant_height, pieces_per_course, plate_length):
-    theta_rad = (2 * math.pi) / pieces_per_course
-    r_outer = d_top / 2
-    r_inner = d_bottom / 2
-    arc_outer = r_outer * theta_rad
-    arc_inner = r_inner * theta_rad
-    arc_width = max(arc_outer, arc_inner)
-    pieces_fit = math.floor(plate_length / arc_width)
-    return pieces_fit if pieces_fit > 0 else 1
+def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
+    break_diameters = course_info["Break Diameters (Top → Bottom)"]
+    course_slant = course_info["Course Slant Height"]
+    course_results = []
+
+    for i in range(course_info["Number of Courses"]):
+        d_top = break_diameters[i]
+        d_bottom = break_diameters[i + 1]
+        r_outer = d_top / 2
+        r_inner = d_bottom / 2
+        arc_angle = (2 * math.pi) / segments_per_course
+        avg_radius = (r_outer + r_inner) / 2
+        arc_width = arc_angle * avg_radius
+
+        # Check vertical fit
+        if course_slant > plate_width:
+            course_results.append({
+                "course": i + 1,
+                "segments": segments_per_course,
+                "fit": 0,
+                "plates": "❌ Too tall for plate"
+            })
+            continue
+
+        # Horizontal fit across plate
+        segments_fit = math.floor(plate_length / arc_width)
+        plates_needed = math.ceil(segments_per_course / segments_fit) if segments_fit > 0 else "Invalid"
+
+        course_results.append({
+            "course": i + 1,
+            "segments": segments_per_course,
+            "fit": segments_fit,
+            "plates": plates_needed
+        })
+
+    return course_results
+
 
 # 🧠 Main button logic
 if st.button("Calculate Cone Layout"):
     slant_height = calculate_slant_height(diameter, angle)
+    course_info = calculate_courses_and_breaks(diameter, angle, moc)
     cone_area = math.pi * (diameter / 2) * slant_height
     plate_options = get_plate_options(moc)
     best = optimize_plate_usage(cone_area, plate_options)
+    if best:
+    plates_needed, (plate_width, plate_length), waste = best
+    course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
 
-    course_info = calculate_courses_and_breaks(diameter, angle, moc)
+    st.subheader("📊 Optimal Layout Recommendation")
+    st.write(f"**Plates Required**: {plates_needed}")
+    st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
+    st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
+
+    st.subheader("📐 Estimated Plate Usage Per Course")
+    for result in course_layout:
+        if isinstance(result["plates"], str):
+            st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
+        else:
+            st.write(
+                f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
+                f"**{result['plates']} plate(s)**"
+            )
 
     # Display Course Info
     st.subheader("🧱 Cone Course Layout")
