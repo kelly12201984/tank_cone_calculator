@@ -111,8 +111,8 @@ if st.button("Calculate Cone Layout"):
     plate_options = get_plate_options(moc)
     best = optimize_plate_usage(cone_area, plate_options)
     if best:
-    plates_needed, (plate_width, plate_length), waste = best
-    course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
+        plates_needed, (plate_width, plate_length), waste = best
+        course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
 
     st.subheader("📊 Optimal Layout Recommendation")
     st.write(f"**Plates Required**: {plates_needed}")
@@ -128,6 +128,10 @@ if st.button("Calculate Cone Layout"):
                 f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
                 f"**{result['plates']} plate(s)**"
             )
+    # Summary line for Chris (number of plates per course, plate size)
+    total_plates = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
+    st.markdown(f"**Summary → Total Plates Needed: {total_plates} using {plate_width}\" x {plate_length}\" plates**")
+
 
     # Display Course Info
     st.subheader("🧱 Cone Course Layout")
@@ -146,19 +150,4 @@ if st.button("Calculate Cone Layout"):
         st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
     else:
         st.error("No viable plate layout found.")
-
-    # 🔄 Arc-Based Plate Estimation Per Course
-    st.subheader("📐 Estimated Plate Usage Per Course")
-    break_diams = course_info["Break Diameters (Top → Bottom)"]
-    course_slant = course_info["Course Slant Height"]
-    pieces_per_course = 4
-
-    for i in range(course_info["Number of Courses"]):
-        d_top = break_diams[i]
-        d_bottom = break_diams[i + 1]
-        plate_length = best[1][1]  # use best-fit plate length
-
-        pieces_fit = estimate_plate_count_per_course(d_top, d_bottom, course_slant, pieces_per_course, plate_length)
-        plates_needed = math.ceil(pieces_per_course / pieces_fit)
-
-        st.markdown(f"**Course {i + 1}**: {pieces_per_course} pieces → fits {pieces_fit} per plate → **{plates_needed} plate(s)**")
+    
