@@ -154,15 +154,15 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
     return course_results
 
 # 🧠 Main button logic
-if st.button("Calculate Cone Layout"):
+    if st.button("Calculate Cone Layout"):
     # 1. Inputs and geometry
-    slant_height = calculate_slant_height(diameter, angle)
-    course_info = calculate_courses_and_breaks(diameter, angle, moc)
-    cone_area = calculate_cone_area(diameter, angle)
-    plate_options = get_plate_options(moc)
+        slant_height = calculate_slant_height(diameter, angle)
+        course_info = calculate_courses_and_breaks(diameter, angle, moc)
+        cone_area = calculate_cone_area(diameter, angle)
+        plate_options = get_plate_options(moc)
 
     # 2. Optimize plate usage using real segment geometry
-    best = optimize_plate_usage(cone_area, plate_options, course_info)
+        best = optimize_plate_usage(cone_area, plate_options, course_info)
 
     if best:
         plates_needed, (plate_width, plate_length), waste = best
