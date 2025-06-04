@@ -160,46 +160,39 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
         course_info = calculate_courses_and_breaks(diameter, angle, moc)
         cone_area = calculate_cone_area(diameter, angle)
         plate_options = get_plate_options(moc)
+    # 2. Optimize plate usage
+best = optimize_plate_usage(cone_area, plate_options, course_info)
 
-    # 2. Optimize plate usage using real segment geometry
-        best = optimize_plate_usage(cone_area, plate_options, course_info)
+if best:
+    plates_needed, (plate_width, plate_length), waste = best
+    course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
 
-    if best:
-        plates_needed, (plate_width, plate_length), waste = best
+    # 4. Output summary
+    st.subheader("📊 Optimal Layout Recommendation")
+    st.write(f"**Plates Required**: {plates_needed}")
+    st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
+    st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
 
-        # 3. Estimate actual usage per course using modeled segments
-        course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
-
-
-        # 4. Output summary
-        st.subheader("📊 Optimal Layout Recommendation")
-        st.write(f"**Plates Required**: {plates_needed}")
-        st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
-        st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
-        st.subheader("📐 Estimated Plate Usage Per Course")
-        for result in course_layout:
-            if isinstance(result["plates"], str):
-                st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
-            else:
-                st.write(
-                    f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
-                    f"**{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
-                )
-
-       
-
-
-        # 5. Summary line for Chris
-        total_plates = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
-        st.markdown(f"**Summary → Total Plates Needed: {total_plates} using {plate_width}\" x {plate_length}\" plates**")
-
-        # 6. Display course-level geometry
-        st.subheader("🧱 Cone Course Layout")
-        st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
-        st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
-        st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
-        st.write("**Break Diameters (top → bottom)**:")
-        st.write(course_info["Break Diameters (Top → Bottom)"])
+    # 5. Course-wise usage
+    st.subheader("📐 Estimated Plate Usage Per Course")
+    for result in course_layout:
+        if isinstance(result["plates"], str):
+            st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
         else:
-            st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
+            st.write(
+                f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
+                f"**{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
+            )
 
+    # 6. Display course-level geometry
+    st.subheader("🧱 Cone Course Layout")
+    st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
+    st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
+    st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
+    st.write("**Break Diameters (top → bottom)**:")
+    st.write(course_info["Break Diameters (Top → Bottom)"])
+
+else:
+    st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
+
+   
