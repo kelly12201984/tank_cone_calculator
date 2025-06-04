@@ -124,18 +124,49 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
 
     return course_results
 
+Per-Course Plate Optimization and Nesting
+
 def optimize_plate_usage(area_needed, plate_options, course_info):
     options = []
     for w, l in plate_options:
-        plate_area = w * l
-        course_layout = estimate_plate_usage_per_course(course_info, w, l)
-        if any(isinstance(result["plates"], str) for result in course_layout):
-            continue
-        plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
-        total_waste = (plates_needed * plate_area) - area_needed
-        options.append((plates_needed, (w, l), total_waste))
+        total_plates = 0
+        total_waste = 0
+        fits_all = True
+
+        for i in range(course_info["Number of Courses"]):
+            d_top = course_info["Break Diameters (Top → Bottom)"][i]
+            d_bottom = course_info["Break Diameters (Top → Bottom)"][i + 1]
+            slant = course_info["Course Slant Height"]
+
+            arc_angle = (2 * math.pi) / 4  # 4 pieces per course
+            r_outer = d_top / 2
+            r_inner = d_bottom / 2
+            avg_radius = (r_outer + r_inner) / 2
+            arc_width = arc_angle * avg_radius
+
+            if slant > w:
+                fits_all = False
+                break
+
+            segments_fit = math.floor(l / arc_width)
+            if segments_fit == 0:
+                fits_all = False
+                break
+
+            plates_needed = math.ceil(4 / segments_fit)  # 4 segments per course
+            plate_area = w * l
+            course_area = math.pi * (r_outer**2 - r_inner**2) / 4
+            waste = (plates_needed * plate_area) - course_area
+
+            total_plates += plates_needed
+            total_waste += waste
+
+        if fits_all:
+            options.append((total_plates, (w, l), total_waste))
+
     options.sort(key=lambda x: (x[0], x[2]))
     return options[0] if options else None
+
 
 
 # Main execution
