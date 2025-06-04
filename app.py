@@ -64,8 +64,18 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         "Course Slant Height": round(course_slant, 2),
         "Break Diameters (Top → Bottom)": break_diameters
     }
+# 🔧 Arc Nesting Function
+def estimate_plate_count_per_course(d_top, d_bottom, slant_height, pieces_per_course, plate_length):
+    theta_rad = (2 * math.pi) / pieces_per_course
+    r_outer = d_top / 2
+    r_inner = d_bottom / 2
+    arc_outer = r_outer * theta_rad
+    arc_inner = r_inner * theta_rad
+    arc_width = max(arc_outer, arc_inner)
+    pieces_fit = math.floor(plate_length / arc_width)
+    return pieces_fit if pieces_fit > 0 else 1
 
-
+# 🧠 Main button logic
 if st.button("Calculate Cone Layout"):
     slant_height = calculate_slant_height(diameter, angle)
     cone_area = math.pi * (diameter / 2) * slant_height
@@ -74,13 +84,15 @@ if st.button("Calculate Cone Layout"):
 
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
 
-
+    # Display Course Info
     st.subheader("🧱 Cone Course Layout")
     st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
     st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
     st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
     st.write("**Break Diameters (top → bottom)**:")
     st.write(course_info["Break Diameters (Top → Bottom)"])
+
+    # Display Optimal Plate Layout
     if best:
         plates_needed, (width, length), waste = best
         st.subheader("📊 Optimal Layout Recommendation")
@@ -89,3 +101,19 @@ if st.button("Calculate Cone Layout"):
         st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
     else:
         st.error("No viable plate layout found.")
+
+    # 🔄 Arc-Based Plate Estimation Per Course
+    st.subheader("📐 Estimated Plate Usage Per Course")
+    break_diams = course_info["Break Diameters (Top → Bottom)"]
+    course_slant = course_info["Course Slant Height"]
+    pieces_per_course = 4
+
+    for i in range(course_info["Number of Courses"]):
+        d_top = break_diams[i]
+        d_bottom = break_diams[i + 1]
+        plate_length = best[1][1]  # use best-fit plate length
+
+        pieces_fit = estimate_plate_count_per_course(d_top, d_bottom, course_slant, pieces_per_course, plate_length)
+        plates_needed = math.ceil(pieces_per_course / pieces_fit)
+
+        st.markdown(f"**Course {i + 1}**: {pieces_per_course} pieces → fits {pieces_fit} per plate → **{plates_needed} plate(s)**")
