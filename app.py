@@ -38,6 +38,7 @@ def optimize_plate_usage(area_needed, plate_options):
         options.append((plates_needed, (w, l), total_waste))
     options.sort(key=lambda x: (x[0], x[2]))  # Prioritize fewer plates and minimal waste
     return options[0] if options else None
+    
 def calculate_courses_and_breaks(diameter, angle_deg, moc):
     if moc == "Stainless Steel":
         plate_widths = [48, 60]
@@ -45,17 +46,16 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         plate_widths = [48, 60, 96]
 
     max_course_slant = max(plate_widths)
-    radius = diameter / 2
-    angle_rad = math.radians(angle_deg)
-    total_slant = radius / math.tan(angle_rad)
+    total_slant = calculate_slant_height(diameter, angle_deg)
 
     num_courses = math.ceil(total_slant / max_course_slant)
-    course_slant = total_slant / num_courses  # make courses even
+    course_slant = total_slant / num_courses
 
+    angle_rad = math.radians(angle_deg)
     break_diameters = []
     for i in range(num_courses + 1):
         rem_slant = total_slant - (i * course_slant)
-        break_radius = rem_slant * math.tan(angle_rad)
+        break_radius = rem_slant * math.sin(angle_rad)
         break_diameters.append(round(break_radius * 2, 2))
 
     return {
@@ -64,6 +64,7 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         "Course Slant Height": round(course_slant, 2),
         "Break Diameters (Top → Bottom)": break_diameters
     }
+
 
 if st.button("Calculate Cone Layout"):
     slant_height = calculate_slant_height(diameter, angle)
