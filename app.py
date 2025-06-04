@@ -29,26 +29,28 @@ def get_plate_options(moc):
     else:  # Carbon Steel
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
-def optimize_plate_usage(area_needed, plate_options):
+def optimize_plate_usage(area_needed, plate_options, course_info):
     options = []
     for w, l in plate_options:
         plate_area = w * l
-        plates_needed = math.ceil(area_needed / plate_area)
+        course_layout = estimate_plate_usage_per_course(course_info, w, l)
+        plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
         total_waste = (plates_needed * plate_area) - area_needed
         options.append((plates_needed, (w, l), total_waste))
-    options.sort(key=lambda x: (x[0], x[2]))  # Prioritize fewer plates and minimal waste
+    options.sort(key=lambda x: (x[0], x[2]))  # Prioritize fewer plates, then minimal waste
     return options[0] if options else None
-    
-def calculate_courses_and_breaks(diameter, angle_deg, moc):
-    if moc == "Stainless Steel":
-        plate_widths = [48, 60]
-    else:
-        plate_widths = [48, 60, 96]
 
-    max_course_slant = max(plate_widths)
+def calculate_courses_and_breaks(diameter, angle_deg, moc):
+    # Set max plate width (i.e., vertical fit limit per course)
+    if moc == "Stainless Steel":
+        max_plate_width = 60
+    else:  # Carbon Steel
+        max_plate_width = 120
+
     total_slant = calculate_slant_height(diameter, angle_deg)
 
-    num_courses = math.ceil(total_slant / max_course_slant)
+    # Estimate number of courses based on vertical space available
+    num_courses = math.ceil(total_slant / max_plate_width)
     course_slant = total_slant / num_courses
 
     angle_rad = math.radians(angle_deg)
@@ -64,6 +66,7 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         "Course Slant Height": round(course_slant, 2),
         "Break Diameters (Top → Bottom)": break_diameters
     }
+
 # 🔧 Arc Nesting Function
 def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
     break_diameters = course_info["Break Diameters (Top → Bottom)"]
@@ -107,9 +110,9 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
 if st.button("Calculate Cone Layout"):
     slant_height = calculate_slant_height(diameter, angle)
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
-    cone_area = math.pi * (diameter / 2) * slant_height
+    cone_area = calculate_cone_area(diameter, angle)
     plate_options = get_plate_options(moc)
-    best = optimize_plate_usage(cone_area, plate_options)
+    best = optimize_plate_usage(cone_area, plate_options, course_info)
     if best:
         plates_needed, (plate_width, plate_length), waste = best
         course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
