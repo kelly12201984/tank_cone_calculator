@@ -164,9 +164,9 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
     # 2. Optimize plate usage
         best = optimize_plate_usage(cone_area, plate_options, course_info)
 
-if best:
-    plates_needed, (plate_width, plate_length), waste = best
-    course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
+    if best:
+        plates_needed, (plate_width, plate_length), waste = best
+        course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
 
     # 4. Output summary
     st.subheader("📊 Optimal Layout Recommendation")
@@ -193,7 +193,7 @@ if best:
     st.write("**Break Diameters (top → bottom)**:")
     st.write(course_info["Break Diameters (Top → Bottom)"])
 
-else:
-    st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
+    else:
+        st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
 
    
