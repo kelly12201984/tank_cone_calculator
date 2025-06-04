@@ -34,38 +34,52 @@ def optimize_plate_usage(area_needed, plate_options, course_info):
     for w, l in plate_options:
         plate_area = w * l
         course_layout = estimate_plate_usage_per_course(course_info, w, l)
+
+        # ❌ Skip if any course is too tall for this plate
+        if any(isinstance(result["plates"], str) for result in course_layout):
+            continue
+
+        # ✅ Only sum valid int plate counts
         plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
         total_waste = (plates_needed * plate_area) - area_needed
+
         options.append((plates_needed, (w, l), total_waste))
-    options.sort(key=lambda x: (x[0], x[2]))  # Prioritize fewer plates, then minimal waste
+
+    # Prioritize fewest plates, then least waste
+    options.sort(key=lambda x: (x[0], x[2]))
     return options[0] if options else None
-
+    
+    #Calculate courses and breaks
 def calculate_courses_and_breaks(diameter, angle_deg, moc):
-    # Set max plate width (i.e., vertical fit limit per course)
-    if moc == "Stainless Steel":
-        max_plate_width = 60
-    else:  # Carbon Steel
-        max_plate_width = 120
-
     total_slant = calculate_slant_height(diameter, angle_deg)
-
-    # Estimate number of courses based on vertical space available
-    num_courses = math.ceil(total_slant / max_plate_width)
-    course_slant = total_slant / num_courses
-
     angle_rad = math.radians(angle_deg)
-    break_diameters = []
-    for i in range(num_courses + 1):
-        rem_slant = total_slant - (i * course_slant)
-        break_radius = rem_slant * math.sin(angle_rad)
-        break_diameters.append(round(break_radius * 2, 2))
 
-    return {
-        "Total Slant Height": round(total_slant, 2),
-        "Number of Courses": num_courses,
-        "Course Slant Height": round(course_slant, 2),
-        "Break Diameters (Top → Bottom)": break_diameters
-    }
+    plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
+
+    best_config = None
+    for width in plate_widths:
+        num_courses = math.ceil(total_slant / width)
+        course_slant = total_slant / num_courses
+
+        break_diameters = []
+        for i in range(num_courses + 1):
+            rem_slant = total_slant - (i * course_slant)
+            break_radius = rem_slant * math.sin(angle_rad)
+            break_diameters.append(round(break_radius * 2, 2))
+
+        config = {
+            "Total Slant Height": round(total_slant, 2),
+            "Number of Courses": num_courses,
+            "Course Slant Height": round(course_slant, 2),
+            "Break Diameters (Top → Bottom)": break_diameters,
+            "Used Plate Width": width  # for reference/debug
+        }
+
+        if best_config is None or config["Number of Courses"] < best_config["Number of Courses"]:
+            best_config = config
+
+    return best_config
+
 
 # 🔧 Arc Nesting Function
 def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
