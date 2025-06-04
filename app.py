@@ -124,7 +124,7 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
 
     return course_results
 
-Per-Course Plate Optimization and Nesting
+#Per-Course Plate Optimization and Nesting
 
 def optimize_plate_usage(area_needed, plate_options, course_info):
     options = []
