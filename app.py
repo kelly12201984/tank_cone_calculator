@@ -8,6 +8,7 @@ st.markdown("Enter the specs for the concentric cone, and get an estimate of the
 
 # Inputs
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1)
+segments_per_course = st.selectbox("Pieces per Course", [2, 4, 6, 8], index=1)  # default to 4
 angle = st.number_input("Angle of Repose (in degrees)", min_value=1)
 moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon Steel"])
 
@@ -21,6 +22,20 @@ def calculate_cone_area(diameter, angle_deg):
     radius = diameter / 2
     slant_height = calculate_slant_height(diameter, angle_deg)
     return math.pi * radius * slant_height
+def model_segment_geometry(d_top, d_bottom, segments_per_course):
+    r_outer = d_top / 2
+    r_inner = d_bottom / 2
+    theta = (2 * math.pi) / segments_per_course  # arc angle in radians
+
+    # Width: arc length (outer edge is the longest)
+    arc_length_outer = r_outer * theta
+    arc_length_inner = r_inner * theta
+    segment_width = max(arc_length_outer, arc_length_inner)
+
+    # Height: difference in radii (radial span of the sector)
+    segment_height = r_outer - r_inner
+
+    return segment_width, segment_height
 
 
 def get_plate_options(moc):
@@ -33,7 +48,7 @@ def optimize_plate_usage(area_needed, plate_options, course_info):
     options = []
     for w, l in plate_options:
         plate_area = w * l
-        course_layout = estimate_plate_usage_per_course(course_info, w, l)
+        course_layout = estimate_plate_usage_per_course(course_info, w, l, segments_per_course)
 
         # ❌ Skip if any course is too tall for this plate
         if any(isinstance(result["plates"], str) for result in course_layout):
@@ -84,20 +99,17 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
 # 🔧 Arc Nesting Function
 def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
     break_diameters = course_info["Break Diameters (Top → Bottom)"]
-    course_slant = course_info["Course Slant Height"]
     course_results = []
 
     for i in range(course_info["Number of Courses"]):
         d_top = break_diameters[i]
         d_bottom = break_diameters[i + 1]
-        r_outer = d_top / 2
-        r_inner = d_bottom / 2
-        arc_angle = (2 * math.pi) / segments_per_course
-        avg_radius = (r_outer + r_inner) / 2
-        arc_width = arc_angle * avg_radius
 
-        # Check vertical fit
-        if course_slant > plate_width:
+        # Use geometry-based model to get bounding box
+        segment_width, segment_height = model_segment_geometry(d_top, d_bottom, segments_per_course)
+
+        # Check vertical fit (height of segment must fit within plate width)
+        if segment_height > plate_width:
             course_results.append({
                 "course": i + 1,
                 "segments": segments_per_course,
@@ -106,8 +118,8 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
             })
             continue
 
-        # Horizontal fit across plate
-        segments_fit = math.floor(plate_length / arc_width)
+        # Check horizontal fit (how many fit across plate length)
+        segments_fit = math.floor(plate_length / segment_width)
         plates_needed = math.ceil(segments_per_course / segments_fit) if segments_fit > 0 else "Invalid"
 
         course_results.append({
@@ -129,7 +141,7 @@ if st.button("Calculate Cone Layout"):
     best = optimize_plate_usage(cone_area, plate_options, course_info)
     if best:
         plates_needed, (plate_width, plate_length), waste = best
-        course_layout = estimate_plate_usage_per_course(course_info, plate_width, plate_length)
+        course_layout = estimate_plate_usage_per_course(course_info, w, l, segments_per_course)
 
     st.subheader("📊 Optimal Layout Recommendation")
     st.write(f"**Plates Required**: {plates_needed}")
