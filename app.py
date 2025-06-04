@@ -56,7 +56,6 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
 
     return best_config
 
-
 def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
     break_diameters = course_info["Break Diameters (Top → Bottom)"]
     course_slant = course_info["Course Slant Height"]
@@ -67,10 +66,12 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
         d_bottom = break_diameters[i + 1]
         r_outer = d_top / 2
         r_inner = d_bottom / 2
+
         arc_angle = (2 * math.pi) / segments_per_course
         avg_radius = (r_outer + r_inner) / 2
-        arc_width = arc_angle * avg_radius
+        arc_width = arc_angle * avg_radius  # Width of a segment along the arc
 
+        # ✅ Check vertical fit
         if course_slant > plate_width:
             course_results.append({
                 "course": i + 1,
@@ -80,28 +81,34 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
             })
             continue
 
+        # ✅ Horizontal fit
         segments_fit = math.floor(plate_length / arc_width)
-        if segments_fit == 0:
+        plates_needed = math.ceil(segments_per_course / segments_fit) if segments_fit > 0 else "❌ Invalid"
+
+        if isinstance(plates_needed, str):
             course_results.append({
                 "course": i + 1,
                 "segments": segments_per_course,
-                "fit": 0,
-                "plates": "❌ Too wide for plate"
+                "fit": segments_fit,
+                "plates": plates_needed
             })
-            continue
+        else:
+            # ✅ Waste calc
+            plate_area = plate_width * plate_length
+            total_arc_area = 0.5 * arc_angle * (r_outer**2 - r_inner**2)
+            total_used = total_arc_area * segments_per_course
+            total_waste = round((plates_needed * plate_area) - total_used, 2)
 
-        plates_needed = math.ceil(segments_per_course / segments_fit)
-        waste = (plates_needed * plate_width * plate_length) - (segments_per_course * arc_width * course_slant)
-
-        course_results.append({
-            "course": i + 1,
-            "segments": segments_per_course,
-            "fit": segments_fit,
-            "plates": plates_needed,
-            "waste": round(waste, 2)
-        })
+            course_results.append({
+                "course": i + 1,
+                "segments": segments_per_course,
+                "fit": segments_fit,
+                "plates": plates_needed,
+                "waste": total_waste
+            })
 
     return course_results
+
 
 def optimize_plate_usage(area_needed, plate_options, course_info):
     options = []
@@ -138,7 +145,7 @@ if st.button("Calculate Cone Layout"):
             if isinstance(result["plates"], str):
                 st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
             else:
-                st.write(f"**Course {result['course']}**: {result['segments']} pieces ➔ fits {result['fit']} per plate ➔ **{result['plates']} plate(s)** — Estimated Waste: {result['waste']} in²")
+                st.write(f"**Course {result['course']}**: {result['segments']} pieces ➝ fits {result['fit']} per plate ➝ **{result['plates']} plate(s)** — Estimated Waste: {result.get('waste', '?')} in²"
 
         total_plates = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
         st.markdown(f"**Summary ➔ Total Plates Needed: {total_plates} using {plate_width}\" x {plate_length}\" plates**")
