@@ -176,16 +176,17 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
         st.write(f"**Plates Required**: {plates_needed}")
         st.write(f"**Plate Size**: {plate_width}\" x {plate_length}\"")
         st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
-
         st.subheader("📐 Estimated Plate Usage Per Course")
         for result in course_layout:
             if isinstance(result["plates"], str):
-        st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
-    else:
-        st.write(
-            f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
-            f"**{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
+            st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
+            else:
+                st.write(
+                    f"**Course {result['course']}**: {result['segments']} pieces → fits {result['fit']} per plate → "
+                    f"**{result['plates']} plate(s)**, Estimated Waste: {result['waste']} in²"
         )
+
+       
 
 
         # 5. Summary line for Chris
@@ -199,6 +200,6 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
         st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
         st.write("**Break Diameters (top → bottom)**:")
         st.write(course_info["Break Diameters (Top → Bottom)"])
-    else:
-        st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
+            else:
+                st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
 
