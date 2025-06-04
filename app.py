@@ -200,6 +200,6 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
         st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
         st.write("**Break Diameters (top → bottom)**:")
         st.write(course_info["Break Diameters (Top → Bottom)"])
-            else:
-                st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
+        else:
+            st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
 
