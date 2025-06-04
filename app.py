@@ -58,52 +58,51 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
 
     return best_config
 
+# --- Helper: Calculate how many gores fit on a plate ---
+def fit_gore_segments_on_plate(gore_width, plate_length):
+    """
+    Calculates how many gore segments (side by side) can fit on the plate.
+    Gores are laid side by side like cookie cutters.
+    """
+    return max(1, plate_length // gore_width)
 
-# --- Arc layout nesting
-def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
-    results = []
-    angle_rad = math.radians(angle)
+# --- Estimate per-course plate usage (realistic gore layout) ---
+def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
+    layout = []
+    total_courses = course_info["Number of Courses"]
+    course_slant = course_info["Course Slant Height"]
     break_diams = course_info["Break Diameters (Top → Bottom)"]
-    slant = course_info["Course Slant Height"]
+    angle_deg = math.degrees(math.atan(course_slant / ((break_diams[0] - break_diams[-1]) / 2)))
+    angle_rad = math.radians(angle_deg)
 
-    for i in range(course_info["Number of Courses"]):
+    for i in range(total_courses):
         d_top = break_diams[i]
-        d_bottom = break_diams[i + 1]
-        r_outer = d_top / 2
-        r_inner = d_bottom / 2
-        arc_angle = (2 * math.pi) / segments_per_course
-        avg_radius = (r_outer + r_inner) / 2
-        arc_width = arc_angle * avg_radius
+        d_bot = break_diams[i + 1]
+        r1 = d_top / 2
+        r2 = d_bot / 2
+        slant_height = course_slant
 
-        # Fit check
-        if slant > plate_width:
-            results.append({
-                "course": i + 1,
-                "segments": segments_per_course,
-                "fit": 0,
-                "plates": "❌ Too tall for plate"
-            })
-            continue
+        arc_length = math.pi * (r1 + r2)  # outer arc approx.
+        flat_angle = arc_length / slant_height  # in radians
+        arc_width = round(flat_angle * slant_height, 2)  # gore "chord width"
 
-        segments_fit = math.floor(plate_length / arc_width)
-        plates_needed = math.ceil(segments_per_course / segments_fit) if segments_fit > 0 else "Invalid"
+        segments = 4  # default
+        gore_width = arc_width / segments
+        fits = fit_gore_segments_on_plate(gore_width, plate_length)
+        plates_needed = math.ceil(segments / fits)
 
-        # Area estimation (sector area)
-        outer_area = math.pi * r_outer ** 2
-        inner_area = math.pi * r_inner ** 2
-        segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
-        plate_area = plate_width * plate_length
-        waste = round((plates_needed * plate_area) - (segments_per_course * segment_area), 2) if isinstance(plates_needed, int) else "N/A"
+        waste = (plates_needed * plate_width * plate_length) - (segments * slant_height * gore_width)
 
-        results.append({
+        layout.append({
             "course": i + 1,
-            "segments": segments_per_course,
-            "fit": segments_fit,
+            "segments": segments,
+            "fit": fits,
             "plates": plates_needed,
-            "waste": waste
+            "waste": round(waste, 2)
         })
 
-    return results
+    return layout
+
 
 # --- Optimizer
 def optimize_plate_usage(area_needed, plate_options, course_info):
