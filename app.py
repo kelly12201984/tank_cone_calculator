@@ -145,7 +145,7 @@ if st.button("Calculate Cone Layout"):
             if isinstance(result["plates"], str):
                 st.write(f"**Course {result['course']}**: ❌ {result['plates']}")
             else:
-                st.write(f"**Course {result['course']}**: {result['segments']} pieces ➝ fits {result['fit']} per plate ➝ **{result['plates']} plate(s)** — Estimated Waste: {result.get('waste', '?')} in²"
+                st.write(f"**Course {result['course']}**: {result['segments']} pieces ➝ fits {result['fit']} per plate ➝ **{result['plates']} plate(s)** — Estimated Waste: {result.get('waste', '?')} in²")
 
         total_plates = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
         st.markdown(f"**Summary ➔ Total Plates Needed: {total_plates} using {plate_width}\" x {plate_length}\" plates**")
