@@ -68,8 +68,6 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
             best_config = config
 
     return best_config
-
-
 def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
     break_diameters = course_info["Break Diameters (Top → Bottom)"]
     course_results = []
@@ -85,19 +83,22 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
             theta = (2 * math.pi) / segments
             arc_outer = r_outer * theta
             arc_inner = r_inner * theta
-            segment_width = max(arc_outer, arc_inner)
-            segment_height = r_outer - r_inner
+            segment_arc = max(arc_outer, arc_inner)
+            segment_radial = r_outer - r_inner
 
-            if segment_height > plate_width:
+            # Side-by-side layout logic: segment_arc = "width", segment_radial = "height"
+            if segment_arc > plate_width or segment_radial > plate_length:
                 continue
 
-            segments_fit = math.floor(plate_length / segment_width)
+            # Nest segments along plate length
+            segments_fit = math.floor(plate_length / segment_radial)
             if segments_fit == 0:
                 continue
 
             plates_needed = math.ceil(segments / segments_fit)
-            waste = (plates_needed * plate_width * plate_length) - (segments * segment_width * segment_height)
-            score = (plates_needed, round(waste, 2), abs(segments - 4))  # prefer 4 segments if tie
+            used_area = segments * segment_arc * segment_radial
+            waste = (plates_needed * plate_width * plate_length) - used_area
+            score = (plates_needed, round(waste, 2), abs(segments - 4))  # prefer 4 segments if tied
 
             if best_option is None or score < best_option["score"]:
                 best_option = {
@@ -117,12 +118,11 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length):
                 "course": i + 1,
                 "segments": "❌",
                 "fit": 0,
-                "plates": "Too tall or wide for plate",
+                "plates": "Too big for plate (even flipped)",
                 "waste": None
             })
 
     return course_results
-
 
 def optimize_plate_usage(area_needed, plate_options, course_info):
     options = []
