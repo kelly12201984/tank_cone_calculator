@@ -11,18 +11,23 @@ diameter = st.number_input("Tank Diameter (in inches)", min_value=1)
 angle = st.number_input("Angle of Repose (in degrees)", min_value=1)
 moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon Steel"])
 
-def calculate_cone_area(diameter, angle_deg):
+def calculate_slant_height(diameter, angle_deg):
     radius = diameter / 2
     angle_rad = math.radians(angle_deg)
-    height = radius * math.tan(angle_rad)
-    slant_height = math.sqrt(radius**2 + height**2)
+    slant = radius / math.tan(angle_rad)
+    return round(slant, 2)
+
+def calculate_cone_area(diameter, angle_deg):
+    radius = diameter / 2
+    slant_height = calculate_slant_height(diameter, angle_deg)
     return math.pi * radius * slant_height
+
 
 def get_plate_options(moc):
     if moc == "Stainless Steel":
         return [(w, l) for w in [48, 60] for l in [96, 120, 144] + list(range(180, 481))]
     else:  # Carbon Steel
-        return [(w, l) for w in [48, 60] for l in [96, 120, 144, 240, 360, 480]]
+        return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 def optimize_plate_usage(area_needed, plate_options):
     options = []
@@ -61,11 +66,13 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
     }
 
 if st.button("Calculate Cone Layout"):
-    cone_area = calculate_cone_area(diameter, angle)
+    slant_height = calculate_slant_height(diameter, angle)
+    cone_area = math.pi * (diameter / 2) * slant_height
     plate_options = get_plate_options(moc)
     best = optimize_plate_usage(cone_area, plate_options)
-# New Course Logic
+
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
+
 
     st.subheader("🧱 Cone Course Layout")
     st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
