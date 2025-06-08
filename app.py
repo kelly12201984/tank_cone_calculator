@@ -72,23 +72,11 @@ def fit_gore_segments_on_plate(gore_width, plate_length):
     return max(1, plate_length // gore_width)
 
 # --- Estimate per-course plate usage (realistic gore layout) ---
-def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segments_per_course=4):
+def estimate_plate_usage_per_course(course_info, plate_width, plate_lengths, segments_per_course=4):
     results = []
     angle_rad = math.radians(angle)
     break_diams = course_info["Break Diameters (Top → Bottom)"]
     slant = course_info["Course Slant Height"]
-
-    # Add all valid lengths for this plate width
-    if plate_width == 96:
-        plate_lengths = [240, 360, 480]
-    elif plate_width == 120:
-        plate_lengths = [240, 360, 480]
-    elif plate_width == 48:
-        plate_lengths = [96, 120, 144] + list(range(180, 481))
-    elif plate_width == 60:
-        plate_lengths = [96, 120, 144] + list(range(180, 481))
-    else:
-        plate_lengths = [plate_length]  # fallback
 
     for i in range(course_info["Number of Courses"]):
         d_top = break_diams[i]
@@ -99,46 +87,34 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
         avg_radius = (r_outer + r_inner) / 2
         arc_width = arc_angle * avg_radius
 
-        # Too tall?
-        if slant > plate_width:
-            results.append({
-                "course": i + 1,
-                "segments": segments_per_course,
-                "fit": 0,
-                "plates": "❌ Too tall for plate",
-                "waste": "N/A"
-            })
-            continue
-
         best_option = None
-        for length in sorted(plate_lengths):
-            segments_fit = math.floor(length / arc_width)
-            if segments_fit <= 0:
-                continue
-            plates_needed = math.ceil(segments_per_course / segments_fit)
-            plate_area = plate_width * length
 
-            # Area of each segment (sector ring)
+        for plate_length in plate_lengths:
+            if slant > plate_width:
+                continue  # skip: too tall to fit
+
+            segments_fit = math.floor(plate_length / arc_width)
+            if segments_fit <= 0:
+                continue  # not even one fits
+
+            plates_needed = math.ceil(segments_per_course / segments_fit)
             outer_area = math.pi * r_outer ** 2
             inner_area = math.pi * r_inner ** 2
             segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
-            total_segment_area = segment_area * segments_per_course
-            total_plate_area = plates_needed * plate_area
-            waste = round(total_plate_area - total_segment_area, 2)
+            plate_area = plate_width * plate_length
+            waste = round((plates_needed * plate_area) - (segments_per_course * segment_area), 2)
 
-            # Pick shortest viable plate
-            if best_option is None or waste < best_option["waste"]:
-                best_option = {
-                    "course": i + 1,
-                    "segments": segments_per_course,
-                    "fit": segments_fit,
-                    "plates": plates_needed,
-                    "waste": waste,
-                    "plate_length": length
-                }
+            option = {
+                "course": i + 1,
+                "segments": segments_per_course,
+                "fit": segments_fit,
+                "plates": plates_needed,
+                "plate_length": plate_length,
+                "waste": waste
+            }
 
-            if plates_needed == 1:
-                break  # Optimal already
+            if best_option is None or option["waste"] < best_option["waste"]:
+                best_option = option
 
         if best_option:
             results.append(best_option)
@@ -148,6 +124,7 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
                 "segments": segments_per_course,
                 "fit": 0,
                 "plates": "❌ No fit",
+                "plate_length": "N/A",
                 "waste": "N/A"
             })
 
@@ -156,17 +133,23 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_length, segm
 # --- Optimizer
 def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_course):
     options = []
-    for w, l in plate_options:
-        course_layout = estimate_plate_usage_per_course(course_info, w, l, segments_per_course)
+    plate_widths = sorted(set(w for w, _ in plate_options))
+    plate_lengths = sorted(set(l for _, l in plate_options))
+
+    for w in plate_widths:
+        course_layout = estimate_plate_usage_per_course(course_info, w, plate_lengths, segments_per_course)
+
         if any(isinstance(result["plates"], str) for result in course_layout):
             continue
-        plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
-        plate_area = w * l
-        total_waste = (plates_needed * plate_area) - area_needed
-        options.append((plates_needed, (w, l), total_waste, course_layout))
 
-    options.sort(key=lambda x: (x[0], x[2]))  # fewest plates, then least waste
+        plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
+        total_waste = sum(result["waste"] for result in course_layout if isinstance(result["waste"], (int, float)))
+
+        options.append((plates_needed, (w, "mixed"), total_waste, course_layout))
+
+    options.sort(key=lambda x: (x[0], x[2]))  # prioritize fewer plates, then less waste
     return options[0] if options else None
+
 
 # --- UI button logic
 if st.button("Calculate Cone Layout"):
