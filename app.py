@@ -240,5 +240,5 @@ if best:
         st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
         st.write("**Break Diameters (top → bottom)**:")
         st.json(course_info["Break Diameters (Top → Bottom)"])
-    else:
+else:
         st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")    
