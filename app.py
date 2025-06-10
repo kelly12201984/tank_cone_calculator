@@ -198,7 +198,7 @@ if st.button("Calculate Cone Layout"):
     r_large = diameter / 2
     r_small = BOTTOM_DIAMETER / 2
     cone_area = math.pi * (r_large + r_small) * slant_height
-        plate_options = get_plate_options(moc)
+    plate_options = get_plate_options(moc)
 
     best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
 
