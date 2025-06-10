@@ -37,7 +37,7 @@ def get_plate_options(moc):
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 # --- Cone course breakdown
-    def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTOM_DIAMETER):
+def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTOM_DIAMETER):
     """Return course info ensuring each course fits available plate widths."""
     plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
     total_slant = calculate_slant_height(diameter, angle_deg, bottom_diameter)
