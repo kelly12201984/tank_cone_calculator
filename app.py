@@ -213,6 +213,10 @@ if st.button("Calculate Layout"):
     for result in results:
         fig = plot_course_layout(result, course_info["Course Slant Height"], course_info["Used Plate Width"])
         st.pyplot(fig)
+    r_large = diameter / 2
+    r_small = BOTTOM_DIAMETER / 2
+    slant_height = calculate_slant_height(diameter, angle)
+    cone_area = math.pi * (r_large + r_small) * slant_height
 
     best = optimize_plate_usage(cone_area, plate_options, course_info)
 
