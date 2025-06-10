@@ -37,39 +37,37 @@ def get_plate_options(moc):
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 # --- Cone course breakdown
-def calculate_courses_and_breaks(diameter, angle_deg, moc):
+def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTOM_DIAMETER):
+    """Return course info ensuring each course fits available plate widths."""
     plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
-    total_slant = calculate_slant_height(diameter, angle_deg)
+    total_slant = calculate_slant_height(diameter, angle_deg, bottom_diameter)
     angle_rad = math.radians(angle_deg)
+    bottom_radius = bottom_diameter / 2
 
-    # Start with the narrowest plate width to create smaller, more realistic courses
+    # Try two courses first, increasing until each course fits the widest plate
+    max_width = max(plate_widths)
+    num_courses = 2
+    while total_slant / num_courses > max_width:
+        num_courses += 1
+
+    course_slant = total_slant / num_courses
     plate_widths.sort()
+    used_width = next((w for w in plate_widths if w >= course_slant), max_width)
 
-    best_config = None
+    break_diameters = []
+    for i in range(num_courses + 1):
+        rem_slant = total_slant - (i * course_slant)
+        break_radius = bottom_radius + rem_slant * math.sin(angle_rad)
+        break_diameters.append(round(break_radius * 2, 2))
 
-    for width in plate_widths:
-        est_courses = math.ceil(total_slant / width)
-        course_slant = total_slant / est_courses
+    return {
+        "Total Slant Height": round(total_slant, 2),
+        "Number of Courses": num_courses,
+        "Course Slant Height": round(course_slant, 2),
+        "Break Diameters (Top → Bottom)": break_diameters,
+        "Used Plate Width": used_width,
+    }
 
-        break_diameters = []
-        for i in range(est_courses + 1):
-            rem_slant = total_slant - (i * course_slant)
-            break_radius = rem_slant * math.sin(angle_rad)
-            break_diameters.append(round(break_radius * 2, 2))
-
-        config = {
-            "Total Slant Height": round(total_slant, 2),
-            "Number of Courses": est_courses,
-            "Course Slant Height": round(course_slant, 2),
-            "Break Diameters (Top → Bottom)": break_diameters,
-            "Used Plate Width": width
-        }
-
-        if best_config is None or est_courses > best_config["Number of Courses"]:
-            best_config = config
-
-    return best_config
-    
 # --- Helper: Calculate how many gores fit on a plate ---
 def fit_gore_segments_on_plate(gore_width, plate_length):
     """
