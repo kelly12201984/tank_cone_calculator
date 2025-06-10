@@ -13,11 +13,6 @@ st.markdown("Small (bottom) diameter is fixed at 2 inches.")
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1, value=168)
 angle = st.number_input("Angle of Repose (in degrees)", min_value=1, value=60)
 moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon Steel"])
-# Optional: Override number of segments (gores) per course
-segments_per_course = st.number_input(
-    "Segments Per Course (Gores)", min_value=2, max_value=12, value=4, step=1,
-    help="How many segments to divide each course into (4 is standard)"
-)
 
 # --- Slant height
 BOTTOM_DIAMETER = 2  # fixed bottom opening of the truncated cone in inches
@@ -38,7 +33,6 @@ def get_plate_options(moc):
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 # --- Cone course breakdown
-
 def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTOM_DIAMETER):
     """Return course info ensuring each course fits available plate widths."""
     plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
@@ -79,8 +73,8 @@ def fit_gore_segments_on_plate(gore_width, plate_length):
     return max(1, plate_length // gore_width)
 
 # --- Estimate per-course plate usage (realistic gore layout) ---
-def estimate_plate_usage_per_course(course_info, plate_options, segments_per_course=4):
-    """Return best plate usage for each course allowing different plate sizes."""
+def estimate_plate_usage_per_course(course_info, plate_options):
+    """Return best plate usage for each course, testing 2-12 even gores."""
     results = []
     break_diams = course_info["Break Diameters (Top → Bottom)"]
     slant = course_info["Course Slant Height"]
@@ -90,54 +84,57 @@ def estimate_plate_usage_per_course(course_info, plate_options, segments_per_cou
         d_bottom = break_diams[i + 1]
         r_outer = d_top / 2
         r_inner = d_bottom / 2
-        arc_angle = (2 * math.pi) / segments_per_course
-        avg_radius = (r_outer + r_inner) / 2
-        arc_width = arc_angle * avg_radius
 
         best_option = None
 
-        for plate_width, plate_length in plate_options:
-            if slant > plate_width:
-                continue  # gore slant does not fit plate width
+        for segs in range(2, 13, 2):
+            arc_angle = (2 * math.pi) / segs
+            avg_radius = (r_outer + r_inner) / 2
+            arc_width = arc_angle * avg_radius
 
-            segments_fit = math.floor(plate_length / arc_width)
-            if segments_fit <= 0:
-                continue  # not even one gore fits
+            for plate_width, plate_length in plate_options:
+                if slant > plate_width:
+                    continue
 
-            plates_needed = math.ceil(segments_per_course / segments_fit)
-            outer_area = math.pi * r_outer ** 2
-            inner_area = math.pi * r_inner ** 2
-            segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
-            plate_area = plate_width * plate_length
-            waste = round((plates_needed * plate_area) - (segments_per_course * segment_area), 2)
+                segments_fit = math.floor(plate_length / arc_width)
+                if segments_fit <= 0:
+                    continue
 
-            option = {
-                "course": i + 1,
-                "segments": segments_per_course,
-                "fit": segments_fit,
-                "plates": plates_needed,
-                "plate_width": plate_width,
-                "plate_length": plate_length,
-                "waste": waste,
-                "gore_width": round(arc_width, 2),
-            }
+                plates_needed = math.ceil(segs / segments_fit)
+                outer_area = math.pi * r_outer ** 2
+                inner_area = math.pi * r_inner ** 2
+                segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
+                plate_area = plate_width * plate_length
+                waste = round((plates_needed * plate_area) - (segs * segment_area), 2)
 
-            if best_option is None or (option["plates"], option["waste"]) < (
-                best_option["plates"], best_option["waste"]
-            ):
-                best_option = option
+                option = {
+                    "course": i + 1,
+                    "segments": segs,
+                    "fit": segments_fit,
+                    "plates": plates_needed,
+                    "plate_width": plate_width,
+                    "plate_length": plate_length,
+                    "waste": waste,
+                    "gore_width": round(arc_width, 2),
+                }
+
+                if best_option is None or (option["plates"], option["waste"]) < (
+                    best_option["plates"], best_option["waste"]
+                ):
+                    best_option = option
+
         if best_option:
             results.append(best_option)
         else:
             results.append({
                 "course": i + 1,
-                "segments": segments_per_course,
+                "segments": "N/A",
                 "fit": 0,
                 "plates": "❌ No fit",
                 "plate_width": "N/A",
                 "plate_length": "N/A",
                 "waste": "N/A",
-                "gore_width": round(arc_width, 2),
+                "gore_width": "N/A",
             })
 
     return results
@@ -185,9 +182,9 @@ def plot_course_layout(result, course_slant_height, max_width=None):
     return fig
                         
 # --- Optimizer
-def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_course):
+def optimize_plate_usage(area_needed, plate_options, course_info):
     """Choose per-course plate sizes to minimize plates then waste."""
-    course_layout = estimate_plate_usage_per_course(course_info, plate_options, segments_per_course)
+    course_layout = estimate_plate_usage_per_course(course_info, plate_options)
 
     if any(isinstance(res["plates"], str) for res in course_layout):
         return None
@@ -198,7 +195,13 @@ def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_c
     return total_plates, "mixed", total_waste, course_layout
 
 # --- UI button logic
+if "calculate_clicked" not in st.session_state:
+    st.session_state.calculate_clicked = False
+
 if st.button("Calculate Cone Layout"):
+    st.session_state.calculate_clicked = True
+
+if st.session_state.calculate_clicked:
     slant_height = calculate_slant_height(diameter, angle)
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
     r_large = diameter / 2
@@ -207,7 +210,8 @@ if st.button("Calculate Cone Layout"):
     plate_options = get_plate_options(moc)
     max_width = max(w for w, _ in plate_options)
 
-    best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
+    best = optimize_plate_usage(cone_area, plate_options, course_info)
+
     if best:
         plates_needed, _, waste, layout = best
 
@@ -219,9 +223,10 @@ if st.button("Calculate Cone Layout"):
         plate_desc = ", ".join(f'{w}" x {l}"' for w, l in sorted(used_sizes)) if used_sizes else "N/A"
 
         st.subheader("🧱 Optimal Layout Recommendation")
-        st.write(f"**Plates Required**: {plates_needed}")
-        st.write(f"**Plate Sizes**: {plate_desc}")
-        st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
+        style = "font-size:20px;"
+        st.markdown(f"<p style='{style}'><b>Plates Required:</b> {plates_needed}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{style}'><b>Plate Sizes:</b> {plate_desc}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{style}'><b>Estimated Waste:</b> {round(waste, 2)} square inches</p>", unsafe_allow_html=True)
 
         st.subheader("🔨 Estimated Plate Usage Per Course")
         for result in layout:
@@ -246,5 +251,5 @@ if st.button("Calculate Cone Layout"):
         st.write(f"**Course Slant Height**: {course_info['Course Slant Height']} inches")
         st.write("**Break Diameters (top → bottom)**:")
         st.json(course_info["Break Diameters (Top → Bottom)"])
-else:
+    else:
         st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
