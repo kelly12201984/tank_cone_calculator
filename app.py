@@ -64,7 +64,7 @@ def fit_gore_segments_on_plate(gore_width, plate_length):
     return max(1, plate_length // gore_width)
 
 # --- Estimate usage
-def estimate_plate_usage_per_course(course_info, plate_options):
+def estimate_plate_usage_per_course(course_info, plate_options, override_gores=None):
     results = []
     break_diams = course_info["Break Diameters (Top → Bottom)"]
     slant = course_info["Course Slant Height"]
