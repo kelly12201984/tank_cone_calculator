@@ -208,7 +208,7 @@ if st.button("Calculate Cone Layout"):
     max_width = max(w for w, _ in plate_options)
 
     best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
-if best:
+    if best:
         plates_needed, _, waste, layout = best
 
         used_sizes = {
