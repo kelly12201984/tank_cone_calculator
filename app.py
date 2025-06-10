@@ -177,7 +177,10 @@ if st.button("Calculate Layout"):
     plate_options = get_plate_options(moc)
 
     # Optional override for gores per course
-    override_gores = [None] * course_info["Number of Courses"]  # Change to [4, 6, ...] if custom per course
+    override_gores = [
+        st.number_input(f"Course {i+1} Gores", min_value=2, max_value=12, step=2, value=4)
+        for i in range(course_info["Number of Courses"])
+    ]
     results = estimate_plate_usage_per_course(course_info, plate_options, override_gores)
 
     st.subheader("Cone Course Layout")
@@ -210,15 +213,6 @@ if st.button("Calculate Layout"):
     for result in results:
         fig = plot_course_layout(result, course_info["Course Slant Height"], course_info["Used Plate Width"])
         st.pyplot(fig)
-
-if st.session_state.calculate_clicked:
-    slant_height = calculate_slant_height(diameter, angle)
-    course_info = calculate_courses_and_breaks(diameter, angle, moc)
-    r_large = diameter / 2
-    r_small = BOTTOM_DIAMETER / 2
-    cone_area = math.pi * (r_large + r_small) * slant_height
-    plate_options = get_plate_options(moc)
-    max_width = max(w for w, _ in plate_options)
 
     best = optimize_plate_usage(cone_area, plate_options, course_info)
 
