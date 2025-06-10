@@ -37,6 +37,7 @@ def get_plate_options(moc):
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 # --- Cone course breakdown
+
 def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTOM_DIAMETER):
     """Return course info ensuring each course fits available plate widths."""
     plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
@@ -71,15 +72,15 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTO
 # --- Helper: Calculate how many gores fit on a plate ---
 def fit_gore_segments_on_plate(gore_width, plate_length):
     """
-    Calculates how many gore segments (side by side) can fit on the plate.
-    Gores are laid side by side like cookie cutters.
+    Calculates how many gore segments fit horizontally along the plate length.
+    Gores are mirrored alternately (upright then upside-down) and placed side by side.
     """
     return max(1, plate_length // gore_width)
 
 # --- Estimate per-course plate usage (realistic gore layout) ---
-def estimate_plate_usage_per_course(course_info, plate_width, plate_lengths, segments_per_course=4):
+def estimate_plate_usage_per_course(course_info, plate_options, segments_per_course=4):
+    """Return best plate usage for each course allowing different plate sizes."""
     results = []
-    angle_rad = math.radians(angle)
     break_diams = course_info["Break Diameters (Top → Bottom)"]
     slant = course_info["Course Slant Height"]
 
@@ -94,13 +95,13 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_lengths, seg
 
         best_option = None
 
-        for plate_length in plate_lengths:
+        for plate_width, plate_length in plate_options:
             if slant > plate_width:
-                continue  # skip: too tall to fit
+                continue  # gore slant does not fit plate width
 
             segments_fit = math.floor(plate_length / arc_width)
             if segments_fit <= 0:
-                continue  # not even one fits
+                continue  # not even one gore fits
 
             plates_needed = math.ceil(segments_per_course / segments_fit)
             outer_area = math.pi * r_outer ** 2
@@ -114,13 +115,15 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_lengths, seg
                 "segments": segments_per_course,
                 "fit": segments_fit,
                 "plates": plates_needed,
+                "plate_width": plate_width,
                 "plate_length": plate_length,
-                "waste": waste
+                "waste": waste,
             }
 
-            if best_option is None or option["waste"] < best_option["waste"]:
+            if best_option is None or (option["plates"], option["waste"]) < (
+                best_option["plates"], best_option["waste"]
+            ):
                 best_option = option
-
         if best_option:
             results.append(best_option)
         else:
@@ -129,31 +132,25 @@ def estimate_plate_usage_per_course(course_info, plate_width, plate_lengths, seg
                 "segments": segments_per_course,
                 "fit": 0,
                 "plates": "❌ No fit",
+                "plate_width": "N/A",
                 "plate_length": "N/A",
-                "waste": "N/A"
+                "waste": "N/A",
             })
-
+            
     return results
 
 # --- Optimizer
 def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_course):
-    options = []
-    plate_widths = sorted(set(w for w, _ in plate_options))
-    plate_lengths = sorted(set(l for _, l in plate_options))
+    """Choose per-course plate sizes to minimize plates then waste."""
+    course_layout = estimate_plate_usage_per_course(course_info, plate_options, segments_per_course)
 
-    for w in plate_widths:
-        course_layout = estimate_plate_usage_per_course(course_info, w, plate_lengths, segments_per_course)
+    if any(isinstance(res["plates"], str) for res in course_layout):
+        return None
 
-        if any(isinstance(result["plates"], str) for result in course_layout):
-            continue
+    total_plates = sum(res["plates"] for res in course_layout)
+    total_waste = sum(res["waste"] for res in course_layout)
 
-        plates_needed = sum(result["plates"] for result in course_layout if isinstance(result["plates"], int))
-        total_waste = sum(result["waste"] for result in course_layout if isinstance(result["waste"], (int, float)))
-
-        options.append((plates_needed, (w, "mixed"), total_waste, course_layout))
-
-    options.sort(key=lambda x: (x[0], x[2]))  # prioritize fewer plates, then less waste
-    return options[0] if options else None
+    return total_plates, "mixed", total_waste, course_layout
 
 # --- UI button logic
 if st.button("Calculate Cone Layout"):
@@ -167,15 +164,18 @@ if st.button("Calculate Cone Layout"):
     best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
 
     if best:
-        plates_needed, (plate_w, plate_l), waste, layout = best
+        plates_needed, _, waste, layout = best
 
-        # Find if lengths vary
-        used_lengths = {res["plate_length"] for res in layout if isinstance(res["plate_length"], (int, float))}
-        plate_length_desc = f'{plate_w}" x {"mixed" if len(used_lengths) > 1 else list(used_lengths)[0]}"'
+        used_sizes = {
+            (res["plate_width"], res["plate_length"])
+            for res in layout
+            if isinstance(res["plates"], int)
+        }
+        plate_desc = ", ".join(f'{w}" x {l}"' for w, l in sorted(used_sizes)) if used_sizes else "N/A"
 
         st.subheader("🧱 Optimal Layout Recommendation")
         st.write(f"**Plates Required**: {plates_needed}")
-        st.write(f"**Plate Size**: {plate_length_desc}")
+        st.write(f"**Plate Sizes**: {plate_desc}")
         st.write(f"**Estimated Waste**: {round(waste, 2)} square inches")
 
         st.subheader("🔨 Estimated Plate Usage Per Course")
@@ -185,12 +185,12 @@ if st.button("Calculate Cone Layout"):
             else:
                 st.write(
                     f"**Course {result['course']}**: {result['segments']} pieces ➝ "
-                    f"fits {result['fit']} per plate of size {plate_w}\" x {result['plate_length']}\" ➝ "
+                    f"fits {result['fit']} per plate of size {result['plate_width']}\" x {result['plate_length']}\" ➝ "
                     f"{result['plates']} plate(s) — Estimated Waste: {result['waste']} in²"
                 )
 
-        st.markdown(f"**Summary ➝ Total Plates Needed**: {plates_needed} using {plate_length_desc} plates")
-
+        st.markdown(f"**Summary ➝ Total Plates Needed**: {plates_needed} using {plate_desc} plates")
+    
         st.subheader("🏛️ Cone Course Layout")
         st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
         st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
