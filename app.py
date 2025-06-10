@@ -171,8 +171,45 @@ def optimize_plate_usage(area_needed, plate_options, course_info):
 if "calculate_clicked" not in st.session_state:
     st.session_state.calculate_clicked = False
 
-if st.button("Calculate Cone Layout"):
-    st.session_state.calculate_clicked = True
+# --- Calculate and Display Results ---
+if st.button("Calculate Layout"):
+    course_info = calculate_courses_and_breaks(diameter, angle, moc)
+    plate_options = get_plate_options(moc)
+
+    # Optional override for gores per course
+    override_gores = [None] * course_info["Number of Courses"]  # Change to [4, 6, ...] if custom per course
+    results = estimate_plate_usage_per_course(course_info, plate_options, override_gores)
+
+    st.subheader("Cone Course Layout")
+    st.markdown(f"**Total Slant Height:** {course_info['Total Slant Height']} inches")
+    st.markdown(f"**Number of Courses:** {course_info['Number of Courses']}")
+    st.markdown(f"**Course Slant Height:** {course_info['Course Slant Height']} inches")
+    st.markdown("**Break Diameters (top → bottom):**")
+    st.write(course_info["Break Diameters (Top → Bottom)"])
+
+    st.subheader("Estimated Plate Usage Per Course")
+    total_plates = 0
+    total_waste = 0
+    for result in results:
+        if isinstance(result["plates"], int):
+            total_plates += result["plates"]
+        if isinstance(result["waste"], (int, float)):
+            total_waste += result["waste"]
+        st.markdown(
+            f"**Course {result['course']}**: {result['segments']} pieces ➝ "
+            f"{result['fit']} per plate of {result['plate_width']}\" x {result['plate_length']}\" ➝ "
+            f"{result['plates']} plate(s) — Waste: {result['waste']} in²"
+        )
+
+    st.markdown("---")
+    st.subheader("Summary")
+    st.markdown(f"**Total Plates Needed:** {total_plates}")
+    st.markdown(f"**Estimated Waste:** {round(total_waste, 2)} square inches")
+
+    st.subheader("Visual Layouts for Each Course")
+    for result in results:
+        fig = plot_course_layout(result, course_info["Course Slant Height"], course_info["Used Plate Width"])
+        st.pyplot(fig)
 
 if st.session_state.calculate_clicked:
     slant_height = calculate_slant_height(diameter, angle)
