@@ -89,13 +89,14 @@ def estimate_plate_usage_per_course(course_info, plate_options):
 
         for segs in range(2, 13, 2):
             arc_angle = (2 * math.pi) / segs
-            avg_radius = (r_outer + r_inner) / 2
-            arc_width = arc_angle * avg_radius
+    # Use the outer radius when estimating gore width so large
+    # slant heights produce realistically wide gores
+            arc_width = arc_angle * r_outer
 
             for plate_width, plate_length in plate_options:
                 if slant > plate_width:
                     continue
-
+        
                 segments_fit = math.floor(plate_length / arc_width)
                 if segments_fit <= 0:
                     continue
