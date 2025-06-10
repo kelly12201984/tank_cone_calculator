@@ -1,5 +1,6 @@
 import streamlit as st
 import math
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Concentric Cone Material & Layout Estimator", layout="centered")
 st.title("📈 Concentric Cone Material & Layout Estimator")
@@ -118,6 +119,7 @@ def estimate_plate_usage_per_course(course_info, plate_options, segments_per_cou
                 "plate_width": plate_width,
                 "plate_length": plate_length,
                 "waste": waste,
+                "gore_width": round(arc_width, 2),
             }
 
             if best_option is None or (option["plates"], option["waste"]) < (
@@ -135,10 +137,47 @@ def estimate_plate_usage_per_course(course_info, plate_options, segments_per_cou
                 "plate_width": "N/A",
                 "plate_length": "N/A",
                 "waste": "N/A",
+                "gore_width": round(arc_width, 2),
             })
-            
+
     return results
 
+# --- Visualization helper ---
+def plot_course_layout(result, course_slant_height):
+    """Return a matplotlib Figure showing gore layout on a plate."""
+    width = result.get("plate_width")
+    length = result.get("plate_length")
+    fit = result.get("fit")
+    gore_w = result.get("gore_width")
+
+    if isinstance(width, str) or fit <= 0:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "No fit", ha="center", va="center")
+        ax.axis("off")
+        return fig
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    # Draw plate boundary
+    ax.add_patch(plt.Rectangle((0, 0), length, width, fill=False, edgecolor="black"))
+
+    # Draw gore bounding boxes alternating orientation
+    for idx in range(fit):
+        x0 = idx * gore_w
+        rect = plt.Rectangle((x0, 0), gore_w, course_slant_height, fill=False, linestyle="--")
+        ax.add_patch(rect)
+        if idx % 2 == 0:
+            ax.plot([x0, x0 + gore_w], [0, course_slant_height], color="tab:blue")
+        else:
+            ax.plot([x0, x0 + gore_w], [course_slant_height, 0], color="tab:orange")
+
+    ax.set_xlim(0, length)
+    ax.set_ylim(0, width)
+    ax.set_aspect('equal')
+    ax.set_xlabel("Plate Length (in)")
+    ax.set_ylabel("Plate Width (in)")
+    ax.set_title(f"Course {result['course']} Layout")
+    return fig
+            
 # --- Optimizer
 def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_course):
     """Choose per-course plate sizes to minimize plates then waste."""
@@ -159,11 +198,11 @@ if st.button("Calculate Cone Layout"):
     r_large = diameter / 2
     r_small = BOTTOM_DIAMETER / 2
     cone_area = math.pi * (r_large + r_small) * slant_height
-    plate_options = get_plate_options(moc)
+        plate_options = get_plate_options(moc)
 
     best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
 
-    if best:
+if best:
         plates_needed, _, waste, layout = best
 
         used_sizes = {
@@ -182,15 +221,19 @@ if st.button("Calculate Cone Layout"):
         for result in layout:
             if isinstance(result["plates"], str):
                 st.write(f"**Course {result['course']}**: {result['segments']} pieces ➝ ❌ {result['plates']}")
+                fig = plot_course_layout(result, course_info["Course Slant Height"])
+                st.pyplot(fig)
             else:
                 st.write(
                     f"**Course {result['course']}**: {result['segments']} pieces ➝ "
                     f"fits {result['fit']} per plate of size {result['plate_width']}\" x {result['plate_length']}\" ➝ "
                     f"{result['plates']} plate(s) — Estimated Waste: {result['waste']} in²"
                 )
+                fig = plot_course_layout(result, course_info["Course Slant Height"])
+                st.pyplot(fig)
 
         st.markdown(f"**Summary ➝ Total Plates Needed**: {plates_needed} using {plate_desc} plates")
-    
+
         st.subheader("🏛️ Cone Course Layout")
         st.write(f"**Total Slant Height**: {course_info['Total Slant Height']} inches")
         st.write(f"**Number of Courses**: {course_info['Number of Courses']}")
@@ -198,5 +241,4 @@ if st.button("Calculate Cone Layout"):
         st.write("**Break Diameters (top → bottom)**:")
         st.json(course_info["Break Diameters (Top → Bottom)"])
     else:
-        st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")
-
+        st.error("❌ No viable plate layout found. Try reducing number of segments or using a different material.")    
