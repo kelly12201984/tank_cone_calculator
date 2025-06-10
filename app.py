@@ -3,7 +3,10 @@ import math
 
 st.set_page_config(page_title="Concentric Cone Material & Layout Estimator", layout="centered")
 st.title("📈 Concentric Cone Material & Layout Estimator")
-st.markdown("Enter the specs for the concentric cone, and get an estimate of the optimal plate layout.")
+st.markdown(
+    "Enter the specs for the concentric cone, and get an estimate of the optimal plate layout."
+)
+st.markdown("Small (bottom) diameter is fixed at 2 inches.")
 
 # --- Inputs
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1, value=168)
@@ -16,10 +19,14 @@ segments_per_course = st.number_input(
 )
 
 # --- Slant height
-def calculate_slant_height(diameter, angle_deg):
-    radius = diameter / 2
+BOTTOM_DIAMETER = 2  # fixed bottom opening of the truncated cone in inches
+
+def calculate_slant_height(diameter, angle_deg, bottom_diameter=BOTTOM_DIAMETER):
+    """Return the slant height of a truncated cone."""
+    r_large = diameter / 2
+    r_small = bottom_diameter / 2
     angle_rad = math.radians(angle_deg)
-    slant = radius / math.sin(angle_rad)
+    slant = (r_large - r_small) / math.sin(angle_rad)
     return round(slant, 2)
 
 # --- Plate options
@@ -30,10 +37,11 @@ def get_plate_options(moc):
         return [(w, l) for w in [96, 120] for l in [240, 360, 480]]
 
 # --- Cone course breakdown
-def calculate_courses_and_breaks(diameter, angle_deg, moc):
+    def calculate_courses_and_breaks(diameter, angle_deg, moc, bottom_diameter=BOTTOM_DIAMETER):
     plate_widths = [48, 60] if moc == "Stainless Steel" else [96, 120]
-    total_slant = calculate_slant_height(diameter, angle_deg)
+    total_slant = calculate_slant_height(diameter, angle_deg, bottom_diameter)
     angle_rad = math.radians(angle_deg)
+    bottom_radius = bottom_diameter / 2
 
     # Start with the narrowest plate width to create smaller, more realistic courses
     plate_widths.sort()
@@ -44,12 +52,12 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         est_courses = math.ceil(total_slant / width)
         course_slant = total_slant / est_courses
 
-        break_diameters = []
-        for i in range(est_courses + 1):
-            rem_slant = total_slant - (i * course_slant)
-            break_radius = rem_slant * math.sin(angle_rad)
-            break_diameters.append(round(break_radius * 2, 2))
-
+        break_diameters = []␊
+        for i in range(est_courses + 1):␊
+            rem_slant = total_slant - (i * course_slant)␊
+            break_radius = bottom_radius + rem_slant * math.sin(angle_rad)
+            break_diameters.append(round(break_radius * 2, 2))␊
+       
         config = {
             "Total Slant Height": round(total_slant, 2),
             "Number of Courses": est_courses,
@@ -154,7 +162,9 @@ def optimize_plate_usage(area_needed, plate_options, course_info, segments_per_c
 if st.button("Calculate Cone Layout"):
     slant_height = calculate_slant_height(diameter, angle)
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
-    cone_area = math.pi * (diameter / 2) * slant_height
+    r_large = diameter / 2
+    r_small = BOTTOM_DIAMETER / 2
+    cone_area = math.pi * (r_large + r_small) * slant_height
     plate_options = get_plate_options(moc)
 
     best = optimize_plate_usage(cone_area, plate_options, course_info, segments_per_course)
