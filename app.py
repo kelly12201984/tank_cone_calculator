@@ -1,21 +1,24 @@
-# Concentric Cone Material & Layout Estimator (Refined: Auto + Override)
+# Concentric Cone Estimator v2.1 – Stable Optimal, Manual Override, Accurate Visuals
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
 import pandas as pd
+import io
 
+# --- UI + Inputs
 st.set_page_config(page_title="Concentric Cone Estimator", layout="centered")
 st.title("Concentric Cone Material & Layout Estimator")
-st.markdown("Enter the specs for the concentric cone, and get an estimate of the optimal plate layout.")
+st.markdown("Enter specs to estimate layout & material usage for a concentric cone.")
 st.markdown("Small (bottom) diameter is fixed at 2 inches.")
 
-# --- Inputs
-BOTTOM_DIAMETER = 2
+opportunity_id = st.text_input("Opportunity ID (optional, used in export file name)")
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1, value=168)
 angle = st.number_input("Angle of Repose (in degrees)", min_value=1, value=60)
 moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon Steel"])
 
-# --- Slant height calculation
+BOTTOM_DIAMETER = 2
+
+# --- Core Logic
 def calculate_slant_height(diameter, angle_deg, bottom_diameter=BOTTOM_DIAMETER):
     r_large = diameter / 2
     r_small = bottom_diameter / 2
@@ -51,45 +54,51 @@ def calculate_courses_and_breaks(diameter, angle_deg, moc):
         "Used Plate Width": used_width,
     }
 
+def find_best_layout(course_num, segs, d_top, d_bottom, slant, plate_options):
+    r_outer, r_inner = d_top / 2, d_bottom / 2
+    arc_angle = (2 * math.pi) / segs
+    avg_radius = (r_outer + r_inner) / 2
+    arc_width = arc_angle * avg_radius
+    best = None
+
+    for plate_w, plate_l in plate_options:
+        if slant > plate_w:
+            continue
+        fit = math.floor(plate_l / arc_width)
+        if fit <= 0:
+            continue
+        plates = math.ceil(segs / fit)
+        outer_area = math.pi * r_outer**2
+        inner_area = math.pi * r_inner**2
+        segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
+        waste = round((plates * plate_w * plate_l) - (segs * segment_area), 2)
+        option = {
+            "Course": course_num + 1,
+            "Gores": segs,
+            "Plate Size": f"{plate_w}\" x {plate_l}\"",
+            "Plates": plates,
+            "Fit/Plate": fit,
+            "Waste (in²)": waste,
+            "Width": plate_w,
+            "Length": plate_l,
+            "Arc Width": round(arc_width, 2)
+        }
+        if best is None or (option["Plates"], option["Waste (in²)"]) < (best["Plates"], best["Waste (in²)"]):
+            best = option
+    return best
+
 def find_optimal_gores_per_course(course_info, plate_options):
     breaks = course_info["Break Diameters"]
     slant = course_info["Course Slant Height"]
     best_gores = []
 
     for i in range(course_info["Number of Courses"]):
-        best = None
         d_top, d_bottom = breaks[i], breaks[i + 1]
-        r_outer, r_inner = d_top / 2, d_bottom / 2
-
-        for segs in range(2, 13, 2):
-            arc_angle = (2 * math.pi) / segs
-            avg_radius = (r_outer + r_inner) / 2
-            arc_width = arc_angle * avg_radius
-
-            for plate_w, plate_l in plate_options:
-                if slant > plate_w:
-                    continue
-                fit = math.floor(plate_l / arc_width)
-                if fit <= 0:
-                    continue
-                plates = math.ceil(segs / fit)
-                outer_area = math.pi * r_outer**2
-                inner_area = math.pi * r_inner**2
-                segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
-                waste = round((plates * plate_w * plate_l) - (segs * segment_area), 2)
-                option = {
-                    "Course": i + 1,
-                    "Gores": segs,
-                    "Plate Size": f"{plate_w}\" x {plate_l}\"",
-                    "Plates": plates,
-                    "Fit/Plate": fit,
-                    "Waste (in²)": waste,
-                    "Width": plate_w,
-                    "Length": plate_l,
-                    "Arc Width": round(arc_width, 2)
-                }
-                if best is None or (option["Plates"], option["Waste (in²)"]) < (best["Plates"], best["Waste (in²)"]):
-                    best = option
+        best = None
+        for segs in range(2, 13, 2):  # 2–12 gores
+            layout = find_best_layout(i, segs, d_top, d_bottom, slant, plate_options)
+            if layout and (best is None or (layout["Plates"], layout["Waste (in²)"]) < (best["Plates"], best["Waste (in²)"])):
+                best = layout
         best_gores.append(best)
     return best_gores
 
@@ -99,90 +108,81 @@ def override_gores_layout(course_info, plate_options, custom_gores):
     output = []
 
     for i, segs in enumerate(custom_gores):
-        best = None
         d_top, d_bottom = breaks[i], breaks[i + 1]
-        r_outer, r_inner = d_top / 2, d_bottom / 2
-        arc_angle = (2 * math.pi) / segs
-        avg_radius = (r_outer + r_inner) / 2
-        arc_width = arc_angle * avg_radius
-
-        for plate_w, plate_l in plate_options:
-            if slant > plate_w:
-                continue
-            fit = math.floor(plate_l / arc_width)
-            if fit <= 0:
-                continue
-            plates = math.ceil(segs / fit)
-            outer_area = math.pi * r_outer**2
-            inner_area = math.pi * r_inner**2
-            segment_area = (outer_area - inner_area) * (arc_angle / (2 * math.pi))
-            waste = round((plates * plate_w * plate_l) - (segs * segment_area), 2)
-            best = {
-                "Course": i + 1,
-                "Gores": segs,
-                "Plate Size": f"{plate_w}\" x {plate_l}\"",
-                "Plates": plates,
-                "Fit/Plate": fit,
-                "Waste (in²)": waste,
-                "Width": plate_w,
-                "Length": plate_l,
-                "Arc Width": round(arc_width, 2)
-            }
-            break
-        output.append(best if best else {"Course": i + 1, "Gores": segs, "Plate Size": "N/A", "Plates": "No Fit", "Fit/Plate": 0, "Waste (in²)": "-"})
+        layout = find_best_layout(i, segs, d_top, d_bottom, slant, plate_options)
+        output.append(layout if layout else {"Course": i + 1, "Gores": segs, "Plate Size": "N/A", "Plates": "No Fit", "Fit/Plate": 0, "Waste (in²)": "-"})
     return output
 
-def plot_layout(result, slant_height):
-    if isinstance(result["Plates"], str):
-        fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, "No fit", ha="center", va="center")
-        ax.axis("off")
-        return fig
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    width, length = result["Width"], result["Length"]
-    gore_w = result["Arc Width"]
-    fit = result["Fit/Plate"]
-
-    for i in range(fit):
-        x0 = i * gore_w
-        poly = [(x0, 0), (x0 + gore_w / 2, slant_height), (x0 + gore_w, 0)] if i % 2 == 0 else [(x0, slant_height), (x0 + gore_w / 2, 0), (x0 + gore_w, slant_height)]
-        ax.add_patch(plt.Polygon(poly, closed=True, alpha=0.4))
-    ax.add_patch(plt.Rectangle((0, 0), length, width, fill=False, edgecolor="black"))
-    ax.set_xlim(0, length)
-    ax.set_ylim(0, width)
-    ax.set_title(f"Course {result['Course']} Layout")
-    return fig
-
-# --- Main Execution
-if st.button("Calculate Layout"):
+# --- Session Initialization
+if "course_info" not in st.session_state:
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
     plate_options = get_plate_options(moc)
+    st.session_state.course_info = course_info
+    st.session_state.plate_options = plate_options
+    st.session_state.optimal_layout = find_optimal_gores_per_course(course_info, plate_options)
+    st.session_state.custom_gores = [r["Gores"] for r in st.session_state.optimal_layout]
 
-    st.subheader("Optimal Gores per Course (Auto-calculated)")
-    optimal_layout = find_optimal_gores_per_course(course_info, plate_options)
-    df_auto = pd.DataFrame(optimal_layout)
-    st.table(df_auto[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
+if st.button("🔁 Recalculate Layout"):
+    course_info = calculate_courses_and_breaks(diameter, angle, moc)
+    plate_options = get_plate_options(moc)
+    st.session_state.course_info = course_info
+    st.session_state.plate_options = plate_options
+    st.session_state.optimal_layout = find_optimal_gores_per_course(course_info, plate_options)
+    st.session_state.custom_gores = [r["Gores"] for r in st.session_state.optimal_layout]
 
-    st.markdown(f"**Total Slant Height:** {course_info['Total Slant Height']} inches")
-    st.markdown(f"**Course Slant Height:** {course_info['Course Slant Height']} inches")
-    st.markdown(f"**Break Diameters (top → bottom):** {course_info['Break Diameters']}")
+# --- Manual Gore Sliders
+st.subheader("Override Gores per Course (Manual Override)")
+custom_gores = []
+for i in range(st.session_state.course_info["Number of Courses"]):
+    gore = st.slider(f"Course {i + 1} Gores", 1, 12, st.session_state.custom_gores[i], step=1, key=f"slider_{i}")
+    custom_gores.append(gore)
+st.session_state.custom_gores = custom_gores
 
-    st.subheader("Override Gores per Course (Manual)")
-    custom_gores = []
-    for i in range(course_info["Number of Courses"]):
-        gore = st.slider(f"Course {i+1} Gores", min_value=1, max_value=12, value=optimal_layout[i]["Gores"], step=1)
-        custom_gores.append(gore)
+# --- Layout Results
+optimal_layout = st.session_state.optimal_layout
+manual_layout = override_gores_layout(
+    st.session_state.course_info, st.session_state.plate_options, st.session_state.custom_gores
+)
 
-    manual_layout = override_gores_layout(course_info, plate_options, custom_gores)
-    df_manual = pd.DataFrame(manual_layout)
+st.subheader("Optimal Gores per Course (Auto-calculated)")
+st.table(pd.DataFrame(optimal_layout)[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
 
-    st.subheader("Manual Layout Summary")
-    st.table(df_manual[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
+st.markdown(f"**Total Slant Height:** {st.session_state.course_info['Total Slant Height']} inches")
+st.markdown(f"**Course Slant Height:** {st.session_state.course_info['Course Slant Height']} inches")
+st.markdown(f"**Break Diameters (top → bottom):** {st.session_state.course_info['Break Diameters']}")
 
-    st.subheader("Course Visual Layouts")
-    for result in manual_layout:
-        fig = plot_layout(result, course_info["Course Slant Height"])
-        st.pyplot(fig)
+st.subheader("Manual Layout Summary")
+df_manual = pd.DataFrame(manual_layout)
+st.table(df_manual[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
 
-    st.success("Layout calculated with both optimal and override gore counts.")
+# --- CSV Export
+csv_buf = io.StringIO()
+df_manual.to_csv(csv_buf, index=False)
+file_name = f"{opportunity_id}_layout_summary.csv" if opportunity_id else "manual_layout_summary.csv"
+st.download_button("📥 Download Manual Layout as CSV", csv_buf.getvalue(), file_name, "text/csv")
+
+# --- Visuals
+def plot_layout(result, slant):
+    fig, ax = plt.subplots(figsize=(result["Length"] / 24, result["Width"] / 12))
+    spacing = result["Arc Width"] * 0.05
+    for i in range(result["Gores"]):
+        x0 = i * (result["Arc Width"] + spacing)
+        tri = (
+            [(x0, 0), (x0 + result["Arc Width"] / 2, slant), (x0 + result["Arc Width"], 0)]
+            if i % 2 == 0
+            else [(x0, slant), (x0 + result["Arc Width"] / 2, 0), (x0 + result["Arc Width"], slant)]
+        )
+        ax.add_patch(plt.Polygon(tri, closed=True, alpha=0.4))
+    ax.add_patch(plt.Rectangle((0, 0), result["Length"], result["Width"], fill=False, edgecolor="black"))
+    ax.set_xlim(0, result["Length"])
+    ax.set_ylim(0, result["Width"])
+    ax.set_title(f"Course {result['Course']} Layout")
+    ax.set_xlabel("Plate Length (in)")
+    ax.set_ylabel("Plate Width (in)")
+    return fig
+
+st.subheader("Course Visual Layouts")
+for result in manual_layout:
+    st.pyplot(plot_layout(result, st.session_state.course_info["Course Slant Height"]))
+
+st.success("Done! 🔆 Thank you for using Kelly's Cone Estimator!")
