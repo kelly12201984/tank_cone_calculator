@@ -175,23 +175,9 @@ file_name = f"{opportunity_id}_layout_summary.csv" if opportunity_id else "manua
 st.download_button("📥 Download Manual Layout as CSV", csv_buf.getvalue(), file_name, "text/csv")
 
 # --- Visuals
-def plot_layout(result, slant):
-        fig, ax = plt.subplots(figsize=(result["Length"] / 24, result["Width"] / 12))
-        spacing = result["Arc Width"] * 0.05
-        for i in range(result["Gores"]):
-            x0 = i * (result["Arc Width"] + spacing)
-            tri = [(x0, 0), (x0 + result["Arc Width"] / 2, slant), (x0 + result["Arc Width"], 0)] if i % 2 == 0 else [(x0, slant), (x0 + result["Arc Width"] / 2, 0), (x0 + result["Arc Width"], slant)]
-            ax.add_patch(plt.Polygon(tri, closed=True, alpha=0.4))
-        ax.add_patch(plt.Rectangle((0, 0), result["Length"], result["Width"], fill=False, edgecolor="black"))
-        ax.set_xlim(0, result["Length"])
-        ax.set_ylim(0, result["Width"])
-        ax.set_title(f"Course {result['Course']} Layout")
-        ax.set_xlabel("Plate Length (in)")
-        ax.set_ylabel("Plate Width (in)")
-        return fig
-
 st.subheader("Course Visual Layouts")
 for result in manual_layout:
-    st.pyplot(plot_layout(result, st.session_state.course_info["Course Slant Height"]))
+    fig = plot_layout(result)
+    st.pyplot(fig)
 
 st.success("Done! 🔆 Thank you for using Kelly's Cone Estimator!")
