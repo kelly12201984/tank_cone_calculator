@@ -191,7 +191,7 @@ def plot_layout(result, slant):
         return fig
 
 st.subheader("Course Visual Layouts")
-        for result in manual_layout:
-        st.pyplot(plot_layout(result, st.session_state.course_info["Course Slant Height"]))
+for result in manual_layout:
+    st.pyplot(plot_layout(result, st.session_state.course_info["Course Slant Height"]))
 
 st.success("Done! 🔆 Thank you for using Kelly's Cone Estimator!")
