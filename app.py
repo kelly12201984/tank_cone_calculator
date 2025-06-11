@@ -1,10 +1,11 @@
-# Concentric Cone Material & Layout Estimator (Fixed Sliders & Correct Visuals)
+# Concentric Cone Material & Layout Estimator (Fixed Layout Cutoff + CSV Export)
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
 import pandas as pd
+import io
 
-st.set_page_config(page_title="Concentric Cone Estimator", layout="centered")
+st.set_page_config(page_title="Concentric Cone Estimator", layout="wide")
 st.title("Concentric Cone Material & Layout Estimator")
 st.markdown("Enter the specs for the concentric cone, and get an estimate of the optimal plate layout.")
 st.markdown("Small (bottom) diameter is fixed at 2 inches.")
@@ -167,12 +168,21 @@ if st.session_state.layout_ready:
     df_manual = pd.DataFrame(manual_layout)
     st.table(df_manual[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
 
+    # --- CSV Export ---
+    csv_buffer = io.StringIO()
+    df_manual.to_csv(csv_buffer, index=False)
+    st.download_button(
+        label="📥 Download Manual Layout as CSV",
+        data=csv_buffer.getvalue(),
+        file_name="manual_layout_summary.csv",
+        mime="text/csv"
+    )
+
     def plot_layout(result, slant_height):
-        fig, ax = plt.subplots(figsize=(8, 4))
+        fig, ax = plt.subplots(figsize=(10, 5))
         width, length = result["Width"], result["Length"]
         gore_w = result["Arc Width"]
         total_gores = result["Gores"]
-
         for i in range(total_gores):
             x0 = i * gore_w
             if i % 2 == 0:
@@ -191,4 +201,4 @@ if st.session_state.layout_ready:
         fig = plot_layout(result, st.session_state.course_info["Course Slant Height"])
         st.pyplot(fig)
 
-    st.success("Layout calculated with both optimal and override gore counts.")
+    st.success("Layout calculated with both optimal and override gore counts. CSV export ready.")
