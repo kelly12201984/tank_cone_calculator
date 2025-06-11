@@ -1,16 +1,14 @@
-# Concentric Cone Estimator v2.1 – Stable Optimal, Manual Override, Accurate Visuals
+# Concentric Cone Estimator v2.2 – Manual Gores Recalculate Plates ✅
 import streamlit as st
 import math
 import matplotlib.pyplot as plt
 import pandas as pd
 import io
 
-# --- UI + Inputs
+# --- UI & Inputs
 st.set_page_config(page_title="Concentric Cone Estimator", layout="centered")
 st.title("Concentric Cone Material & Layout Estimator")
-st.markdown("Enter specs to estimate layout & material usage for a concentric cone.")
 st.markdown("Small (bottom) diameter is fixed at 2 inches.")
-
 opportunity_id = st.text_input("Opportunity ID (optional, used in export file name)")
 diameter = st.number_input("Tank Diameter (in inches)", min_value=1, value=168)
 angle = st.number_input("Angle of Repose (in degrees)", min_value=1, value=60)
@@ -18,7 +16,7 @@ moc = st.selectbox("Material of Construction (MOC)", ["Stainless Steel", "Carbon
 
 BOTTOM_DIAMETER = 2
 
-# --- Core Logic
+# --- Core Calculations
 def calculate_slant_height(diameter, angle_deg, bottom_diameter=BOTTOM_DIAMETER):
     r_large = diameter / 2
     r_small = bottom_diameter / 2
@@ -95,7 +93,7 @@ def find_optimal_gores_per_course(course_info, plate_options):
     for i in range(course_info["Number of Courses"]):
         d_top, d_bottom = breaks[i], breaks[i + 1]
         best = None
-        for segs in range(2, 13, 2):  # 2–12 gores
+        for segs in range(2, 13, 2):
             layout = find_best_layout(i, segs, d_top, d_bottom, slant, plate_options)
             if layout and (best is None or (layout["Plates"], layout["Waste (in²)"]) < (best["Plates"], best["Waste (in²)"])):
                 best = layout
@@ -113,7 +111,7 @@ def override_gores_layout(course_info, plate_options, custom_gores):
         output.append(layout if layout else {"Course": i + 1, "Gores": segs, "Plate Size": "N/A", "Plates": "No Fit", "Fit/Plate": 0, "Waste (in²)": "-"})
     return output
 
-# --- Session Initialization
+# --- Initial State
 if "course_info" not in st.session_state:
     course_info = calculate_courses_and_breaks(diameter, angle, moc)
     plate_options = get_plate_options(moc)
@@ -130,7 +128,7 @@ if st.button("🔁 Recalculate Layout"):
     st.session_state.optimal_layout = find_optimal_gores_per_course(course_info, plate_options)
     st.session_state.custom_gores = [r["Gores"] for r in st.session_state.optimal_layout]
 
-# --- Manual Gore Sliders
+# --- Manual Override Sliders
 st.subheader("Override Gores per Course (Manual Override)")
 custom_gores = []
 for i in range(st.session_state.course_info["Number of Courses"]):
@@ -138,19 +136,22 @@ for i in range(st.session_state.course_info["Number of Courses"]):
     custom_gores.append(gore)
 st.session_state.custom_gores = custom_gores
 
-# --- Layout Results
-optimal_layout = st.session_state.optimal_layout
+# --- Recalculate Manual Layout
 manual_layout = override_gores_layout(
-    st.session_state.course_info, st.session_state.plate_options, st.session_state.custom_gores
+    st.session_state.course_info,
+    st.session_state.plate_options,
+    st.session_state.custom_gores
 )
 
+# --- Optimal Layout Output
 st.subheader("Optimal Gores per Course (Auto-calculated)")
-st.table(pd.DataFrame(optimal_layout)[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
+st.table(pd.DataFrame(st.session_state.optimal_layout)[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
 
 st.markdown(f"**Total Slant Height:** {st.session_state.course_info['Total Slant Height']} inches")
 st.markdown(f"**Course Slant Height:** {st.session_state.course_info['Course Slant Height']} inches")
 st.markdown(f"**Break Diameters (top → bottom):** {st.session_state.course_info['Break Diameters']}")
 
+# --- Manual Layout Output
 st.subheader("Manual Layout Summary")
 df_manual = pd.DataFrame(manual_layout)
 st.table(df_manual[["Course", "Gores", "Plate Size", "Plates", "Fit/Plate", "Waste (in²)"]])
