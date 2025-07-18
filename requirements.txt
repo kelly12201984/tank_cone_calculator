@@ -3,5 +3,4 @@ openai
 numpy
 matplotlib
 pandas
-io
 math
